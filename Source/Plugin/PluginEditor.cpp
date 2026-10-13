@@ -36,6 +36,10 @@ GrooveLabEditor::GrooveLabEditor (GrooveLabProcessor& p)
     setupActions();
     setupResults();
 
+    // Children created before being parented built their sub-components (e.g. slider text
+    // boxes) with the default look; re-send so everything uses ours.
+    sendLookAndFeelChange();
+
     processor.addChangeListener (this);
     refreshResult();
 
@@ -498,6 +502,17 @@ void GrooveLabEditor::paint (juce::Graphics& g)
         drawSectionTitle (g, soundTitle, "SOUND");
     }
     drawSectionTitle (g, actionArea.reduced (16, 12), "CREATE");
+
+    // Quick help under the action buttons
+    {
+        auto help = actionArea.reduced (16, 14);
+        help.setTop (pasteCodeButton.getBottom() + 14);
+        g.setColour (Colours::textFaint);
+        g.setFont (uiFont (11.5f));
+        g.drawFittedText ("Lock a tile to keep its part when generating. The circular arrow regenerates only that "
+                          "instrument. Drag the waveform or the handle straight into Ableton.",
+                          help, juce::Justification::topLeft, 6, 1.0f);
+    }
 
     // Result texts
     auto res = resultArea.reduced (18, 12);

@@ -1,0 +1,105 @@
+name: Build & Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (tests, VST3, pluginval)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libasound2-dev libx11-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libxcomposite-dev libxext-dev libfreetype-dev libfontconfig1-dev \
+            libgl1-mesa-dev xvfb
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --target JGLTests jgl_render JovahGrooveLab_VST3 JovahGrooveLab_Standalone
+
+      - name: Unit tests
+        run: xvfb-run -a ./build/JGLTests_artefacts/Release/JGLTests
+
+      - name: pluginval (strictness 10)
+        run: |
+          curl -sSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
+          unzip -o -q pluginval.zip
+          xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process --timeout-ms 600000 \
+            --validate "build/JovahGrooveLab_artefacts/Release/VST3/Jovah Groove Lab.vst3"
+
+      - name: Render demo loops
+        run: |
+          mkdir -p demo
+          cd demo
+          R=../build/jgl_render_artefacts/Release/jgl_render
+          $R --style 0 --bpm 124 --key D --scale 1 --inst dhol,tabla,tumbi --seed 1 --out AfroIndian_124_Dmin.wav --describe
+          $R --style 1 --seed 2 --out TribalRitual.wav --describe
+          $R --style 3 --seed 3 --out PsychedelicIndia.wav --describe
+          $R --style 4 --seed 4 --out MelodicIndian.wav --describe
+          $R --style 5 --seed 5 --out PeakTime.wav --describe
+          $R --style 7 --seed 6 --out FolkElectronica.wav --describe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-vst3-and-demo-loops
+          path: |
+            build/JovahGrooveLab_artefacts/Release/VST3
+            demo/*.wav
+
+  macos:
+    name: macOS (universal VST3 + AU + Standalone, auval)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (universal binary)
+        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release -j 4 --target JGLTests JovahGrooveLab_VST3 JovahGrooveLab_AU JovahGrooveLab_Standalone
+
+      - name: Unit tests
+        run: ./build/JGLTests_artefacts/Release/JGLTests
+
+      - name: Validate the Audio Unit with auval
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/JovahGrooveLab_artefacts/Release/AU/Jovah Groove Lab.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          sleep 2
+          auval -a | grep -i jova || true
+          auval -strict -v aumu JgLb Jova
+
+      - name: pluginval (VST3 + AU)
+        run: |
+          curl -sSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
+          unzip -o -q pluginval.zip
+          ./pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate-in-process --timeout-ms 600000 \
+            --validate "build/JovahGrooveLab_artefacts/Release/VST3/Jovah Groove Lab.vst3"
+          ./pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate-in-process --timeout-ms 600000 \
+            --validate ~/Library/Audio/Plug-Ins/Components/"Jovah Groove Lab.component"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cd build/JovahGrooveLab_artefacts/Release
+          ditto -c -k --keepParent "VST3/Jovah Groove Lab.vst3" ../../../dist/JovahGrooveLab-VST3-macOS.zip
+          ditto -c -k --keepParent "AU/Jovah Groove Lab.component" ../../../dist/JovahGrooveLab-AU-macOS.zip
+          ditto -c -k --keepParent "Standalone/Jovah Groove Lab.app" ../../../dist/JovahGrooveLab-Standalone-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-plugins
+          path: dist/*.zip
