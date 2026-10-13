@@ -53,7 +53,8 @@ set(JGL_ENGINE_SOURCES
     Source/Engine/GenerationService.cpp
     Source/IO/AppPaths.cpp
     Source/IO/WavExporter.cpp
-    Source/IO/PresetManager.cpp)
+    Source/IO/PresetManager.cpp
+    Source/IO/SampleImporter.cpp)
 
 set(JGL_PLUGIN_SOURCES
     Source/Plugin/Parameters.cpp
@@ -166,6 +167,15 @@ if(JGL_BUILD_TOOLS)
     target_include_directories(jgl_render PRIVATE Source)
     target_compile_definitions(jgl_render PRIVATE ${JGL_COMMON_DEFINITIONS})
         target_link_libraries(jgl_render
+        PRIVATE ${JGL_JUCE_MODULES}
+                juce::juce_recommended_config_flags
+                juce::juce_recommended_warning_flags)
+
+    juce_add_console_app(jgl_import PRODUCT_NAME "jgl_import")
+    target_sources(jgl_import PRIVATE ${JGL_ENGINE_SOURCES} Tools/ImportCli.cpp)
+    target_include_directories(jgl_import PRIVATE Source)
+    target_compile_definitions(jgl_import PRIVATE ${JGL_COMMON_DEFINITIONS})
+    target_link_libraries(jgl_import
         PRIVATE ${JGL_JUCE_MODULES}
                 juce::juce_recommended_config_flags
                 juce::juce_recommended_warning_flags)

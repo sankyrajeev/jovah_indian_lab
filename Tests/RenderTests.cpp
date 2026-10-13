@@ -141,3 +141,103 @@ public:
 static RenderTests renderTests;
 
 } // namespace jgl
+
+#include "IO/SampleImporter.h"
+
+namespace jgl
+{
+
+class ImporterTests : public juce::UnitTest
+{
+public:
+    ImporterTests() : juce::UnitTest ("Sample importer", "JGL") {}
+
+    void runTest() override
+    {
+        const double sr = 44100.0;
+
+        beginTest ("Onset detection finds each hit in a take");
+        {
+            juce::AudioBuffer<float> take (1, (int) (sr * 2.0));
+            take.clear();
+            const double times[] = { 0.1, 0.45, 0.9, 1.5 };
+            const float levels[] = { 0.9f, 0.3f, 0.6f, 0.15f };
+            for (int h = 0; h < 4; ++h)
+                for (int i = 0; i < (int) (0.25 * sr); ++i)
+                    take.addSample (0, (int) (times[h] * sr) + i, levels[h] * std::sin ((float) i * 0.07f) * std::exp (-(float) i / 2000.0f));
+
+            const auto onsets = SampleImporter::detectOnsets (take, sr);
+            expectEquals ((int) onsets.size(), 4);
+            for (size_t k = 0; k < onsets.size() && k < 4; ++k)
+                expectWithinAbsoluteError (onsets[k] / sr, times[k], 0.006);
+        }
+
+        beginTest ("Pitch estimation (YIN)");
+        {
+            for (double hz : { 110.0, 220.0, 293.66, 587.33 })
+            {
+                juce::AudioBuffer<float> note (1, (int) sr);
+                for (int i = 0; i < note.getNumSamples(); ++i)
+                {
+                    double v = 0.0;
+                    for (int k = 1; k <= 8; ++k) v += std::sin (juce::MathConstants<double>::twoPi * hz * k * i / sr) / k;
+                    note.setSample (0, i, (float) (0.3 * v));
+                }
+                expectWithinAbsoluteError (SampleImporter::estimatePitchHz (note, sr), hz, hz * 0.01);
+            }
+            expectEquals (SampleImporter::noteName (62), juce::String ("D4"));
+        }
+
+        beginTest ("Import writes a playable sample library with velocity layers");
+        {
+            auto tmp = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("JGL_import_test");
+            tmp.deleteRecursively();
+            auto src = tmp.getChildFile ("src");
+            src.createDirectory();
+
+            juce::AudioBuffer<float> take (2, (int) (sr * 3.0));
+            take.clear();
+            for (int h = 0; h < 6; ++h)
+                for (int i = 0; i < (int) (0.3 * sr); ++i)
+                    for (int c = 0; c < 2; ++c)
+                        take.addSample (c, (int) ((0.2 + 0.45 * h) * sr) + i,
+                                        (0.15f + 0.15f * (float) h) * std::sin ((float) i * 0.05f) * std::exp (-(float) i / 3000.0f));
+            expect (WavExporter::write (take, sr, WavBitDepth::Pcm24, src.getChildFile ("na_take.wav")).wasOk());
+
+            SampleImporter::Options o;
+            o.instrument = InstrumentId::Tabla;
+            o.articulation = "Na";
+            o.velocityLayers = 3;
+            o.destinationRoot = tmp.getChildFile ("Samples");
+            const auto rep = SampleImporter::run ({ src }, o);
+            expectEquals (rep.samplesWritten, 6);
+
+            SampleLibrary lib;
+            expectEquals (lib.load (o.destinationRoot), 6);
+            expectEquals (lib.numLayers (InstrumentId::Tabla, TablaArt::Na), 3);
+            expect (lib.pick (InstrumentId::Tabla, TablaArt::Na, 1.0f, 7)->layer == 3);
+
+            // Melodic note with the root detected from the audio
+            juce::AudioBuffer<float> note (1, (int) sr);
+            for (int i = 0; i < note.getNumSamples(); ++i)
+                note.setSample (0, i, 0.4f * (float) std::sin (juce::MathConstants<double>::twoPi * 293.66 * i / sr));
+            auto melodicSrc = tmp.getChildFile ("mel");
+            melodicSrc.createDirectory();
+            expect (WavExporter::write (note, sr, WavBitDepth::Pcm24, melodicSrc.getChildFile ("sustain_take1.wav")).wasOk());
+            SampleImporter::Options m;
+            m.instrument = InstrumentId::Nadaswaram;
+            m.destinationRoot = o.destinationRoot;
+            expectEquals (SampleImporter::run ({ melodicSrc }, m).samplesWritten, 1);
+            expect (o.destinationRoot.getChildFile ("nadaswaram/notes/nadaswaram_D4.wav").existsAsFile());
+            SampleLibrary lib2;
+            lib2.load (o.destinationRoot);
+            expect (lib2.hasMelodicNotes (InstrumentId::Nadaswaram));
+
+            tmp.deleteRecursively();
+        }
+    }
+};
+
+static ImporterTests importerTests;
+
+} // namespace jgl

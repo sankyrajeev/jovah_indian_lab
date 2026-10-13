@@ -17,7 +17,7 @@ models, or comes from samples **you** install (see [Recorded samples](#recorded-
 
 | Area | What it does |
 |---|---|
-| **Instruments** | Tabla, Dhol, Dholak, Manjira, Ghungroo, Taali (claps), Tumbi, Sitar, Bansuri, Tanpura. Each has its own articulations, such as tabla bols Dha/Dhin/Ge/Ka/Na/Tin/Tun/Te/Re/Ghe (gumki glide), dhol dagga/tilli/edge/both, and manjira open/closed. |
+| **Instruments** | Tabla, Dhol, Dholak, Manjira, Ghungroo, Taali (claps), Tumbi, Sitar, Bansuri, Tanpura, Nadaswaram (temple double reed, with gamaka). Each has its own articulations, such as tabla bols Dha/Dhin/Ge/Ka/Na/Tin/Tun/Te/Re/Ghe (gumki glide), dhol dagga/tilli/edge/both, and manjira open/closed. |
 | **Personalities** | Afro Indian, Tribal Ritual, Indian Underground, Psychedelic India, Melodic Indian, Peak-Time Percussion, Minimal Hypnosis, Folk Electronica, Custom. Each changes the pattern vocabulary, framework, microtiming pocket, fills, polymeter, repetition and melodic behaviour. |
 | **Rhythmic frameworks** | Keherwa (8), Dadra (6, triplet grid), Teentaal (16), Rupak (7 = 3+2+2), Club 4/4, Tresillo 3+3+2, all adapted to a 4/4 club grid. |
 | **Groove engine** | Complexity, Swing (50–75 %), Groove (personality microtiming), Humanize (per-hit plus slow player drift), Density, Energy, Variation, Ghost level, Accent strength. |
@@ -154,6 +154,24 @@ uses them automatically, with velocity layers and round-robin takes.
   sitar/notes/sitar_C3.wav  sitar_G3.wav ...                   (root from the note name, C4 = MIDI 60, or a MIDI number)
   tumbi/notes/  bansuri/notes/  tanpura/notes/
 ```
+
+### Importing a sample pack
+
+`jgl_import` converts a pack's raw files into this layout:
+- **Percussion takes** are sliced into individual hits by onset detection, trimmed, faded, and split into velocity layers by loudness, keeping their relative dynamics.
+- **Melodic notes** get their root note from the file name, or detected from the audio (YIN).
+
+```bash
+jgl_import --list                                                    # instruments & articulation names
+jgl_import --instrument tabla --articulation Na --layers 3 ~/Packs/Tabla/Na/
+jgl_import --instrument dhol --articulation Dagga ~/Packs/Dhol/dagga_takes.wav
+jgl_import --instrument nadaswaram ~/Packs/Nadaswaram/Sustains/
+```
+
+**Licensing.**
+- **Commercial packs:** most licences (Loopmasters and similar) allow you to use the sounds in your own music, which includes loading them into this plugin on your own machine. They forbid redistributing the samples, so they can never ship inside a distributed build.
+- **Distributing the plugin with sounds:** use CC0 recordings, your own recordings, or a publisher's explicit OEM/redistribution licence.
+- **Sounds pulled out of another commercial plugin:** do not extract them. Swar Plug is one example.
 
 WAV, AIFF and FLAC are supported. Files are downmixed to mono and trimmed to 12 s. Use **… → Rescan
 samples** after adding files. Tiles show **SAMPLES** or **MODELLED** so you always know which you hear.
