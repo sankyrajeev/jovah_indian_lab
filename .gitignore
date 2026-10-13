@@ -1,0 +1,9 @@
+build*/
+cmake-build-*/
+out/
+.DS_Store
+*.user
+.vscode/
+.idea/
+*.wav
+!docs/**/*.wav
