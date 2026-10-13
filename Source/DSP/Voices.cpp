@@ -656,7 +656,7 @@ namespace
         s.swellDb = 2.0;
         s.sustainDecayDbPerSec = 1.0;
         s.vibratoRate = 5.6;
-        s.vibratoDepth = r.ornament == OrnGamaka ? 0.0 : 0.006;
+        s.vibratoDepth = r.ornament == OrnGamaka ? 0.0 : 0.0025;
         s.vibratoDelay = 0.3;
         s.brightnessVel = 0.5;
 
@@ -716,8 +716,8 @@ PitchCurve Voices::makePitchCurve (const VoiceRequest& r)
     }
     else if (r.ornament == OrnGamaka)
     {
-        pc.gamakaDepth = r.ornamentSemis;
-        pc.gamakaRate = 6.0;
+        pc.gamakaDepth = r.ornamentSemis * 0.5;   // a gentle swing towards the neighbour, not a trill
+        pc.gamakaRate = 4.0;
         pc.gamakaStart = std::min (0.15, r.durationSec * 0.25);
         pc.gamakaEnd = std::max (pc.gamakaStart, r.durationSec * 0.85);
     }
@@ -736,7 +736,7 @@ PitchCurve Voices::makePitchCurve (const VoiceRequest& r)
     if (r.vibratoSemis > 0.0f)
     {
         pc.vibratoSemis = r.vibratoSemis;
-        pc.vibratoRate = 5.2 + 1.2 * ((r.seed >> 8) % 100) / 100.0;
+        pc.vibratoRate = 4.8 + 0.6 * ((r.seed >> 8) % 100) / 100.0;
         pc.vibratoDelay = std::min (0.25, r.durationSec * 0.3);
         pc.vibratoPhase = (double) (r.seed % 628) / 100.0;
     }

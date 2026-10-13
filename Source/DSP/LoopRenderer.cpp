@@ -296,7 +296,7 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
                 req.fallSemis = e.fallSemis;
                 req.fallStartSec = std::max (0.0, req.durationSec - e.fallBeats * secPerBeat);
                 if (id == InstrumentId::CustomVoice)
-                    req.vibratoSemis = rs.voiceVibrato * 0.45f;
+                    req.vibratoSemis = rs.voiceVibrato * 0.15f;   // recordings already carry their own vibrato
                 onset -= Voices::leadInSeconds (req);
             }
             else if (id != InstrumentId::Dhol && isBassArticulation (id, e.articulation) && nearDagga (onset))

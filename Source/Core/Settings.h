@@ -20,11 +20,11 @@ struct ComposeSettings
     std::array<bool, (size_t) numInstruments> enabled {};
 
     // Expression of the sample-driven voice ("Your Sample")
-    float voiceBend = 0.5f;      // meend glides between notes and scoops into notes
-    float voiceShake = 0.35f;    // gamaka: oscillating ornaments on held notes
-    float voiceFalls = 0.3f;     // pitch dives at phrase ends
-    float voiceStutter = 0.15f;  // rhythmic re-triggers of a note
-    float voiceOctave = 0.2f;    // octave leaps on phrase peaks
+    float voiceBend = 0.3f;      // meend glides between notes and scoops into notes
+    float voiceShake = 0.1f;    // gamaka: oscillating ornaments on held notes
+    float voiceFalls = 0.2f;     // pitch dives at phrase ends
+    float voiceStutter = 0.1f;  // rhythmic re-triggers of a note
+    float voiceOctave = 0.15f;    // octave leaps on phrase peaks
 
     bool operator== (const ComposeSettings& o) const noexcept
     {
@@ -56,7 +56,7 @@ struct RenderSettings
     int delayTime = 1;        // index into delayTimeNames()
     float filter = 0.0f;      // -1 = low-pass .. 0 = off .. +1 = high-pass
     float levelDb = 0.0f;     // master output level applied after normalisation
-    float voiceVibrato = 0.3f; // vibrato depth of the sample-driven voice
+    float voiceVibrato = 0.0f; // vibrato depth of the sample-driven voice
     double sampleRate = 48000.0;
 
     bool operator== (const RenderSettings& o) const noexcept

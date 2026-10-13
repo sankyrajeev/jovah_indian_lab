@@ -245,17 +245,17 @@ namespace
                     break;
 
                 case InstrumentId::Nadaswaram:
-                    if (e.length >= 0.75 && rng.chance (chance * 0.7))
+                    if (e.length >= 1.5 && rng.chance (chance * 0.15))
                     {
                         e.ornament = OrnGamaka;      // shaking the note: the nadaswaram's signature
                         e.ornamentPitch = upperNeighbour (s, e.pitch);
                     }
-                    else if (hasPrev && std::abs (interval) >= 1 && std::abs (interval) <= 7 && rng.chance (chance * 0.8))
+                    else if (hasPrev && std::abs (interval) >= 1 && std::abs (interval) <= 5 && rng.chance (chance * 0.4))
                     {
                         e.glideFrom = (float) -interval;
-                        e.glideBeats = (float) std::min (0.35, e.length * 0.5);
+                        e.glideBeats = (float) std::min (0.2, e.length * 0.3);
                     }
-                    else if (rng.chance (chance * 0.4))
+                    else if (rng.chance (chance * 0.2))
                     {
                         e.ornament = OrnKan;
                         e.ornamentPitch = upperNeighbour (s, e.pitch);
@@ -326,29 +326,29 @@ namespace
 
             // Meend between notes, or a scoop into the note
             const int interval = contiguous ? e.pitch - prev->pitch : 0;
-            if (contiguous && interval != 0 && std::abs (interval) <= 12 && xr.chance (0.2 + 0.7 * cs.voiceBend))
+            if (contiguous && interval != 0 && std::abs (interval) <= 7 && xr.chance (cs.voiceBend * 0.6))
             {
                 e.glideFrom = (float) -interval;
-                e.glideBeats = (float) std::min (e.length * 0.6, 0.1 + 0.4 * cs.voiceBend);
+                e.glideBeats = (float) std::min (e.length * 0.35, 0.06 + 0.18 * cs.voiceBend);
             }
-            else if (xr.chance (cs.voiceBend * 0.5))
+            else if (e.length >= 0.5 && xr.chance (cs.voiceBend * 0.2))
             {
-                e.glideFrom = (float) -(1 + (int) std::floor (xr.uniform() * (1.0 + 3.0 * cs.voiceBend)));
-                e.glideBeats = (float) (0.06 + 0.16 * cs.voiceBend);
+                e.glideFrom = cs.voiceBend > 0.75f ? -2.0f : -1.0f;   // gentle scoop into a held note
+                e.glideBeats = (float) (0.05 + 0.06 * cs.voiceBend);
             }
 
-            // Gamaka shake on held notes
-            if (e.length >= 0.5 && ! phraseEnd && xr.chance (cs.voiceShake * 0.8))
+            // Gamaka shake, only on long held notes
+            if (e.length >= 1.0 && ! phraseEnd && e.glideFrom == 0.0f && xr.chance (cs.voiceShake * 0.5))
             {
                 e.ornament = OrnGamaka;
                 e.ornamentPitch = stepInScale (s, e.pitch, 1);
             }
 
             // Fall at the end of a phrase
-            if (phraseEnd && xr.chance (0.15 + cs.voiceFalls * 0.85))
+            if (phraseEnd && xr.chance (cs.voiceFalls * 0.8))
             {
-                e.fallSemis = -(float) (1.0 + std::floor (xr.uniform() * (1.0 + 9.0 * cs.voiceFalls)));
-                e.fallBeats = (float) std::min (e.length * 0.8, 0.2 + 0.6 * cs.voiceFalls);
+                e.fallSemis = -(float) (1.0 + std::floor (xr.uniform() * (1.0 + 5.0 * cs.voiceFalls)));
+                e.fallBeats = (float) std::min (e.length * 0.5, 0.15 + 0.35 * cs.voiceFalls);
             }
 
             // Stutter: re-trigger the note on a 16th (or 32nd) grid before it settles

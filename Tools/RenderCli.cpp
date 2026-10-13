@@ -107,12 +107,12 @@ int main (int argc, char* argv[])
     rs.saturation = arg (a, "--saturation", juce::String (style.saturation)).getFloatValue();
     rs.filter = arg (a, "--filter", "0").getFloatValue();
 
-    cs.voiceBend = arg (a, "--bend", "0.5").getFloatValue();
-    cs.voiceShake = arg (a, "--shake", "0.35").getFloatValue();
-    cs.voiceFalls = arg (a, "--falls", "0.3").getFloatValue();
-    cs.voiceStutter = arg (a, "--stutter", "0.15").getFloatValue();
-    cs.voiceOctave = arg (a, "--octave", "0.2").getFloatValue();
-    rs.voiceVibrato = arg (a, "--vibrato", "0.3").getFloatValue();
+    cs.voiceBend = arg (a, "--bend", "0.3").getFloatValue();
+    cs.voiceShake = arg (a, "--shake", "0.1").getFloatValue();
+    cs.voiceFalls = arg (a, "--falls", "0.2").getFloatValue();
+    cs.voiceStutter = arg (a, "--stutter", "0.1").getFloatValue();
+    cs.voiceOctave = arg (a, "--octave", "0.15").getFloatValue();
+    rs.voiceVibrato = arg (a, "--vibrato", "0.0").getFloatValue();
 
     const auto voicePath = arg (a, "--voice");
     if (voicePath.isNotEmpty())
