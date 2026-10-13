@@ -55,6 +55,10 @@ static std::vector<InstrumentInfo> buildRegistry()
                    0.0f, 0.0f, 0.35f, 0.0f, 1.0f,
                    { "Pluck" }, {} });
 
+    r.push_back ({ InstrumentId::Nadaswaram, "Nadaswaram", "nadaswaram", "Temple double-reed lead", F::Wind, true,
+                   0.0f, 0.05f, 0.38f, 0.28f, 0.9f,
+                   { "Note" }, {} });
+
     return r;
 }
 

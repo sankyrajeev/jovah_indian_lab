@@ -49,7 +49,7 @@ public:
                 for (int style : { (int) StyleId::PsychedelicIndia, (int) StyleId::MelodicIndian, (int) StyleId::FolkElectronica, (int) StyleId::AfroIndian })
                     for (uint64_t seed = 1; seed <= 4; ++seed)
                     {
-                        auto cs = test::compose (style, { InstrumentId::Sitar, InstrumentId::Bansuri, InstrumentId::Tumbi, InstrumentId::Tanpura }, 4, scale);
+                        auto cs = test::compose (style, { InstrumentId::Sitar, InstrumentId::Bansuri, InstrumentId::Tumbi, InstrumentId::Tanpura, InstrumentId::Nadaswaram }, 4, scale);
                         const auto a = Arranger::compose (cs, SeedSet::fromMaster (seed * 7919 + (uint64_t) scale));
                         const auto ctx = GenerationContext::make (cs);
                         const auto& s = scaleProfile (scale);
@@ -68,7 +68,7 @@ public:
                                 }
                                 expect (scaleContains (s, e.pitch), s.name + ": pitch " + juce::String (e.pitch) + " not in scale");
                                 expect (range.contains (e.pitch) || e.pitch == range.getEnd(), "pitch inside instrument range");
-                                if (e.ornament == OrnKan || e.ornament == OrnMurki)
+                                if (e.ornament == OrnKan || e.ornament == OrnMurki || e.ornament == OrnGamaka)
                                     expect (scaleContains (s, e.ornamentPitch), "grace notes from the scale");
                                 if (e.glideFrom != 0.0f && p.instrument != InstrumentId::Tumbi)
                                     expect (scaleContains (s, e.pitch + juce::roundToInt (e.glideFrom)), "meend starts on a scale note");

@@ -34,7 +34,7 @@ struct LoopResult
     static bool isMelodicPart (InstrumentId id) noexcept
     {
         return id == InstrumentId::Sitar || id == InstrumentId::Bansuri
-            || id == InstrumentId::Tumbi || id == InstrumentId::Tanpura;
+            || id == InstrumentId::Tumbi || id == InstrumentId::Tanpura || id == InstrumentId::Nadaswaram;
     }
 
     void computePeaks (int buckets)

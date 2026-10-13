@@ -52,10 +52,24 @@ struct GenerationContext
         {
             case InstrumentId::Tanpura: return MelodicRole::Drone;
             case InstrumentId::Tumbi:   return MelodicRole::Riff;
-            case InstrumentId::Sitar:   return MelodicRole::Lead;
-            case InstrumentId::Bansuri: return has (InstrumentId::Sitar) ? MelodicRole::Answer : MelodicRole::Lead;
-            default:                    return MelodicRole::None;
+            case InstrumentId::Nadaswaram: return MelodicRole::Lead;
+            case InstrumentId::Sitar:      return has (InstrumentId::Nadaswaram) ? MelodicRole::Answer : MelodicRole::Lead;
+            case InstrumentId::Bansuri:    return (has (InstrumentId::Sitar) || has (InstrumentId::Nadaswaram)) ? MelodicRole::Answer : MelodicRole::Lead;
+            default:                       return MelodicRole::None;
         }
+    }
+
+    /** Answering instruments take turns: returns this instrument's turn index and the number of answerers. */
+    std::pair<int, int> answerSlot (InstrumentId id) const noexcept
+    {
+        int slot = 0, count = 0;
+        for (auto a : { InstrumentId::Sitar, InstrumentId::Bansuri })
+            if (has (a) && roleFor (a) == MelodicRole::Answer)
+            {
+                if (a == id) slot = count;
+                ++count;
+            }
+        return { slot, count };
     }
 };
 

@@ -22,6 +22,7 @@ enum class InstrumentId : int
     Sitar,
     Bansuri,
     Tanpura,
+    Nadaswaram,
     Count
 };
 
@@ -45,7 +46,8 @@ enum Ornament : uint8_t
     OrnNone = 0,
     OrnKan = 1,      // grace note from the upper neighbour (bansuri)
     OrnMurki = 2,    // quick turn before the note (sitar)
-    OrnSlideIn = 3   // short slide into the note from below (tumbi)
+    OrnSlideIn = 3,  // short slide into the note from below (tumbi)
+    OrnGamaka = 4    // oscillation to the upper neighbour and back (nadaswaram)
 };
 
 //==============================================================================

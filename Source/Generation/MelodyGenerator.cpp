@@ -244,6 +244,24 @@ namespace
                     }
                     break;
 
+                case InstrumentId::Nadaswaram:
+                    if (e.length >= 0.75 && rng.chance (chance * 0.7))
+                    {
+                        e.ornament = OrnGamaka;      // shaking the note: the nadaswaram's signature
+                        e.ornamentPitch = upperNeighbour (s, e.pitch);
+                    }
+                    else if (hasPrev && std::abs (interval) >= 1 && std::abs (interval) <= 7 && rng.chance (chance * 0.8))
+                    {
+                        e.glideFrom = (float) -interval;
+                        e.glideBeats = (float) std::min (0.35, e.length * 0.5);
+                    }
+                    else if (rng.chance (chance * 0.4))
+                    {
+                        e.ornament = OrnKan;
+                        e.ornamentPitch = upperNeighbour (s, e.pitch);
+                    }
+                    break;
+
                 case InstrumentId::Tumbi:
                     if (e.dyn == Dynamic::Accent && rng.chance (chance * 0.4))
                     {
@@ -394,9 +412,10 @@ namespace
         const int bars = ctx.settings.bars;
         const double unit = bars == 1 ? 2.0 : 4.0;   // call / response segment length in beats
         const int segments = (int) std::lround (bars * 4.0 / unit);
-        const bool hasAnswerer = role == MelodicRole::Lead && ctx.has (InstrumentId::Bansuri) && id == InstrumentId::Sitar;
+        const auto [answerSlot, numAnswerers] = ctx.answerSlot (id);
+        const bool hasAnswerer = role == MelodicRole::Lead && numAnswerers > 0;
         const float variation = ctx.settings.variation * (1.0f - 0.5f * ctx.style->repetition);
-        const bool sustained = id == InstrumentId::Bansuri || mb.legato > 0.6f;
+        const bool sustained = id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram || mb.legato > 0.6f;
 
         // Motif rhythm shared by calls and responses.
         const auto& cell = chooseRhythm (ctx, rng, false, sustained);
@@ -439,7 +458,7 @@ namespace
             Rng segRng = rng.fork ((uint64_t) seg + 1000);
 
             const bool plays = role == MelodicRole::Lead ? (isCall || ! hasAnswerer)
-                                                         : ! isCall;   // Answer role
+                                                         : (! isCall && (segments / 2 < numAnswerers || (seg / 2) % std::max (1, numAnswerers) == answerSlot));   // Answer role
             if (! plays)
                 continue;
 
@@ -493,7 +512,18 @@ namespace
                 else if (echo && i < 2 && i < (int) callPitches.size() && i < n - 1)
                     p = callPitches[(size_t) i];
                 else if (i == n - 1)
-                    p = endTarget;
+                {
+                    // Cadence chosen from where the line actually is, so it lands by step.
+                    if (isCall && role == MelodicRole::Lead)
+                        p = callEnding (s, wp.pitches, prev, segRng);
+                    else
+                    {
+                        const int saBelow = nearestInSet (wp.pitches, prev - pitchClass (prev));
+                        const int saAbove = nearestInSet (wp.pitches, saBelow + 12);
+                        p = (std::abs (saAbove - prev) < std::abs (saBelow - prev) && ! finalSegment) ? saAbove : saBelow;
+                        if (! scaleContains (s, p) || pitchClass (p) != 0) p = endTarget;
+                    }
+                }
                 else if (i == 0)
                     p = choosePitch (wp, startPitch, startPitch, strong, segRng);
                 else
@@ -504,6 +534,9 @@ namespace
                     p = choosePitch (wp, prev, target, strong, segRng);
                 }
 
+                // Keep leaps singable: fold anything wider than a fifth back towards the previous note.
+                while (p - prev > 7 && p - 12 >= wp.pitches.front()) p -= 12;
+                while (prev - p > 7 && p + 12 <= wp.pitches.back()) p += 12;
                 p = i > 0 ? safeStep (wp, prev, p) : nearestInSet (wp.pitches, p);
 
                 pitches.push_back (p);
@@ -546,6 +579,7 @@ juce::Range<int> MelodyGenerator::pitchRange (InstrumentId id, const GenerationC
     {
         case InstrumentId::Sitar:   return { -5, juce::jlimit (7, 17, span) };
         case InstrumentId::Bansuri: return { -3, juce::jlimit (9, 19, span + 2) };
+        case InstrumentId::Nadaswaram: return { -5, juce::jlimit (9, 17, span + 3) };
         case InstrumentId::Tumbi:   return { -5, 12 };
         case InstrumentId::Tanpura: return { -12, 0 };
         default:                    return { -5, 12 };

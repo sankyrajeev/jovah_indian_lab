@@ -19,6 +19,7 @@ namespace
         double initialSemis = 0.0, initialTau = 0.03;
         std::vector<std::pair<double, double>> points;   // (time, semis) held values, last one ends at 0
         double ramp = 0.014;
+        double gamakaDepth = 0.0, gamakaRate = 6.5, gamakaStart = 0.12, gamakaEnd = 0.0;
 
         double semis (double t) const noexcept
         {
@@ -43,6 +44,14 @@ namespace
 
             if (initialSemis != 0.0)
                 s += initialSemis * std::exp (-t / initialTau);
+
+            // Gamaka: the note swings up to its neighbour and back, easing in and out.
+            if (gamakaDepth != 0.0 && t > gamakaStart && t < gamakaEnd)
+            {
+                const double u = t - gamakaStart;
+                const double fade = std::min (1.0, u / 0.08) * std::min (1.0, (gamakaEnd - t) / 0.08);
+                s += gamakaDepth * fade * 0.5 * (1.0 - std::cos (twoPi * gamakaRate * u));
+            }
 
             return s;
         }
@@ -550,6 +559,13 @@ namespace
             pc.points = { { 0.0, r.ornamentSemis }, { 0.045, 0.0 } };
             pc.ramp = 0.018;
         }
+        else if (r.ornament == OrnGamaka)
+        {
+            pc.gamakaDepth = r.ornamentSemis;
+            pc.gamakaRate = 6.0;
+            pc.gamakaStart = std::min (0.15, r.durationSec * 0.25);
+            pc.gamakaEnd = std::max (pc.gamakaStart, r.durationSec * 0.85);
+        }
         else if (r.ornament == OrnMurki)
         {
             const double up = r.ornamentSemis;
@@ -692,6 +708,68 @@ namespace
     }
 }
 
+namespace
+{
+    /** Nadaswaram: loud conical double reed. Bright, buzzy spectrum with nasal formants,
+        reed "bark" at the attack, wide vibrato, gamakas and glides between notes. */
+    void renderNadaswaram (std::vector<float>& out, const VoiceRequest& r, Rng& rng)
+    {
+        HarmonicSpec s;
+        s.numHarmonics = 32;
+        s.ampExponent = 0.55;
+        s.formants = { { 650.0, 260.0, 0.8 }, { 1250.0, 450.0, 2.6 }, { 2800.0, 900.0, 1.4 } };
+        s.sustained = true;
+        s.attackSec = r.ornament == OrnKan ? 0.02 : 0.035;
+        s.releaseSec = 0.08;
+        s.swellDb = 2.0;
+        s.sustainDecayDbPerSec = 1.0;
+        s.vibratoRate = 5.6;
+        s.vibratoDepth = r.ornament == OrnGamaka ? 0.0 : 0.006;
+        s.vibratoDelay = 0.3;
+        s.brightnessVel = 0.5;
+
+        auto pc = makePitchCurve (r);
+        if (r.ornament == OrnNone && r.glideSec <= 0.0)
+        {
+            pc.initialSemis = -0.45;   // players lean into the note from below
+            pc.initialTau = 0.06;
+        }
+
+        const double sr = r.sampleRate;
+        const double lead = Voices::leadInSeconds (r);
+        const double dur = r.durationSec + lead;
+        std::vector<float> tone;
+        renderHarmonic (tone, s, r.frequency, pc, r.velocity, dur, sr, rng);
+
+        // Reed nonlinearity + buzz: slow random amplitude flutter, soft clipping, reed noise.
+        Noise noise (rng.next());
+        dsp::Biquad buzz, bark;
+        buzz.setBandpass (3200.0, 1.2, sr);
+        bark.setBandpass (r.frequency * 4.0, 1.5, sr);
+        dsp::OnePole flutterLp;
+        flutterLp.setLowpass (18.0, sr);
+        const double peak = 1.0e-9 + [&] { float m = 0; for (auto v : tone) m = std::max (m, std::abs (v)); return (double) m; }();
+
+        for (size_t i = 0; i < tone.size(); ++i)
+        {
+            const double t = i / sr;
+            double env = t < s.attackSec ? smoothstep (t / s.attackSec) : 1.0;
+            if (t > dur) env *= std::max (0.0, 1.0 - (t - dur) / s.releaseSec);
+            const float n = noise.next();
+            const double flutter = 1.0 + 0.6 * flutterLp.lowpass (n);
+            double x = tone[i] / peak * flutter;
+            x = std::tanh (1.6 * x) / std::tanh (1.6);                       // reed saturation
+            x += (buzz.process (n) * 0.06 + bark.process (n) * 0.5 * std::exp (-t / 0.03)) * env;
+            tone[i] = (float) x;
+        }
+
+        const double amp = velCurve (r.velocity, 1.0f) * 0.3;
+        out.resize (tone.size());
+        for (size_t i = 0; i < tone.size(); ++i)
+            out[i] = (float) (tone[i] * amp);
+    }
+}
+
 //==============================================================================
 double Voices::leadInSeconds (const VoiceRequest& r)
 {
@@ -719,6 +797,7 @@ void Voices::render (const VoiceRequest& r, std::vector<float>& out)
         case InstrumentId::Tanpura:  renderTanpura (out, r, rng); break;
         case InstrumentId::Tumbi:    renderTumbi (out, r, rng); break;
         case InstrumentId::Bansuri:  renderBansuri (out, r, rng); break;
+        case InstrumentId::Nadaswaram: renderNadaswaram (out, r, rng); break;
         default:                     out.clear(); break;
     }
 }

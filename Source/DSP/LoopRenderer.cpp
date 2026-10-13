@@ -195,6 +195,7 @@ double LoopRenderer::tonicMidi (InstrumentId id, int keyRoot)
         case InstrumentId::Sitar:   return 48 + pc;                    // C3 .. B3
         case InstrumentId::Tanpura: return 48 + pc;
         case InstrumentId::Bansuri: return 60 + pc;                    // C4 .. B4
+        case InstrumentId::Nadaswaram: return 57 + pitchClass (pc - 9); // A3 .. G#4
         case InstrumentId::Tumbi:   return 67 + pitchClass (pc - 7);   // G4 .. F#5
         default:                    return 60 + pc;
     }
@@ -317,8 +318,8 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
             applyTarab (partBuf, rs.keyRoot, a.scaleIndex, sr);
 
         // Keep the sub range for the drums.
-        if (id == InstrumentId::Tanpura || id == InstrumentId::Sitar || id == InstrumentId::Bansuri)
-            highPassCircular (partBuf, id == InstrumentId::Tanpura ? 85.0 : 70.0, sr);
+        if (id == InstrumentId::Tanpura || id == InstrumentId::Sitar || id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram)
+            highPassCircular (partBuf, id == InstrumentId::Tanpura ? 85.0 : (id == InstrumentId::Nadaswaram ? 120.0 : 70.0), sr);
 
         const float gain = dsp::dbToGain (info.gainDb);
         for (int c = 0; c < 2; ++c)
