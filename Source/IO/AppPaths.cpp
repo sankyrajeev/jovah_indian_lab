@@ -35,6 +35,7 @@ juce::File AppPaths::root()
 juce::File AppPaths::exportsFolder() { return ensure (root().getChildFile ("Exports")); }
 juce::File AppPaths::samplesFolder() { return ensure (root().getChildFile ("Samples")); }
 juce::File AppPaths::presetsFolder() { return ensure (root().getChildFile ("Presets")); }
+juce::File AppPaths::voicesFolder()  { return ensure (root().getChildFile ("Voices")); }
 
 juce::File AppPaths::settingsFolder()
 {

@@ -47,6 +47,7 @@ set(JGL_ENGINE_SOURCES
     Source/Generation/GrooveEngine.cpp
     Source/DSP/Voices.cpp
     Source/DSP/SampleLibrary.cpp
+    Source/DSP/SampleAnalysis.cpp
     Source/DSP/Effects.cpp
     Source/DSP/LoopRenderer.cpp
     Source/Engine/LoopPlayer.cpp
@@ -65,6 +66,7 @@ set(JGL_PLUGIN_SOURCES
     Source/UI/WaveformView.cpp
     Source/UI/Decor.cpp
     Source/UI/Widgets.cpp
+    Source/UI/VoicePanel.cpp
     Source/IO/UserSettings.cpp)
 
 set(JGL_COMMON_DEFINITIONS
@@ -148,6 +150,7 @@ if(JGL_BUILD_TESTS)
         Tests/RenderTests.cpp
         Tests/ExportTests.cpp
         Tests/EngineTests.cpp
+        Tests/VoiceTests.cpp
         Tests/TestHelpers.h)
     target_include_directories(JGLTests PRIVATE Source)
     target_compile_definitions(JGLTests PRIVATE ${JGL_COMMON_DEFINITIONS} JGL_UNIT_TESTS=1 JUCE_MODAL_LOOPS_PERMITTED=1)

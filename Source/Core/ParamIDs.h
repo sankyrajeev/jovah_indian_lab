@@ -31,6 +31,14 @@ namespace jgl::ParamIDs
     inline constexpr const char* delayTime  = "delayTime";
     inline constexpr const char* filter     = "filter";
 
+    // Sample-driven voice expression
+    inline constexpr const char* voiceBend    = "voiceBend";
+    inline constexpr const char* voiceShake   = "voiceShake";
+    inline constexpr const char* voiceFalls   = "voiceFalls";
+    inline constexpr const char* voiceStutter = "voiceStutter";
+    inline constexpr const char* voiceOctave  = "voiceOctave";
+    inline constexpr const char* voiceVibrato = "voiceVibrato";
+
     /** "inst_tabla", "inst_sitar" ... */
     inline juce::String instrument (InstrumentId id) { return juce::String ("inst_") + instrumentInfo (id).key; }
 

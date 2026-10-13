@@ -23,6 +23,7 @@ enum class InstrumentId : int
     Bansuri,
     Tanpura,
     Nadaswaram,
+    CustomVoice,   // any user-loaded single-note sample, played as a melodic lead
     Count
 };
 
@@ -69,7 +70,9 @@ struct NoteEvent
     float glideFrom = 0.0f;     // melodic: start offset in semitones (meend / slide)
     float glideBeats = 0.0f;    // melodic: glide duration in beats
     uint8_t ornament = OrnNone;
-    int ornamentPitch = 0;      // pitch of the grace note for kan/murki
+    int ornamentPitch = 0;      // pitch of the grace note for kan/murki/gamaka
+    float fallSemis = 0.0f;     // melodic: dive at the end of the note (semitones)
+    float fallBeats = 0.0f;     // melodic: how long before the note end the dive starts
     bool swingable = true;      // false for triplet-grid events
     uint32_t seed = 0;          // per-hit micro-variation & humanisation draws
 };

@@ -31,7 +31,7 @@ void drawTempleSunset (juce::Graphics&, juce::Rectangle<float> area);
 void drawInstrument (juce::Graphics&, InstrumentId id, juce::Rectangle<float> area);
 
 enum class Icon { Wave, Bars, Copy, Upload, Folder, Search, Heart, HeartFilled, LockOpen, LockClosed, Regenerate,
-                  Play, Pause, Dots, Grip, ChevronLeft, ChevronRight, ChevronDown, ChevronUp };
+                  Play, Pause, Dots, Grip, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sliders };
 
 void drawIcon (juce::Graphics&, Icon icon, juce::Rectangle<float> area, juce::Colour colour);
 

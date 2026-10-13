@@ -19,7 +19,8 @@ namespace
         std::vector<juce::String> ids { ParamIDs::bpm, ParamIDs::key, ParamIDs::scale, ParamIDs::bars, ParamIDs::level,
                                         ParamIDs::style, ParamIDs::framework, complexity, swing, groove, humanize,
                                         density, energy, variation, ghost, accent, saturation, reverb, delay,
-                                        delayTime, filter };
+                                        delayTime, filter, voiceBend, voiceShake, voiceFalls, voiceStutter,
+                                        voiceOctave, voiceVibrato };
         for (auto id : allInstruments())
             ids.push_back (ParamIDs::instrument (id));
         return ids;
@@ -157,6 +158,11 @@ ComposeSettings GrooveLabProcessor::composeSettingsFromParams() const
     cs.density = param (density);
     cs.energy = param (energy);
     cs.variation = param (variation);
+    cs.voiceBend = param (voiceBend);
+    cs.voiceShake = param (voiceShake);
+    cs.voiceFalls = param (voiceFalls);
+    cs.voiceStutter = param (voiceStutter);
+    cs.voiceOctave = param (voiceOctave);
     for (auto id : allInstruments())
         cs.enabled[(size_t) toIndex (id)] = param (ParamIDs::instrument (id).toRawUTF8()) > 0.5f;
     return cs;
@@ -179,6 +185,7 @@ RenderSettings GrooveLabProcessor::renderSettingsFromParams() const
     rs.delayTime = choice (delayTime);
     rs.filter = param (filter);
     rs.levelDb = param (ParamIDs::level);
+    rs.voiceVibrato = param (voiceVibrato);
     rs.sampleRate = preparedSampleRate.load();
     return rs;
 }
@@ -192,6 +199,7 @@ void GrooveLabProcessor::requestRender()
         std::lock_guard<std::mutex> g (seedLock);
         req.seeds = seeds;
     }
+    req.userVoice = userVoice;
     req.id = nextRequestId++;
     lastRequestedId = req.id;
     renderPending = true;
@@ -516,6 +524,7 @@ juce::Result GrooveLabProcessor::exportCurrentLoop (juce::File& writtenFile)
         q.render = r->render;
         q.render.sampleRate = sr;
         q.seeds = r->seeds;
+        q.userVoice = r->userVoice;
         auto lib = service.getSamples();
         rerendered = GenerationService::renderNow (q, lib.get(), nullptr, &r->arrangement);
         if (rerendered == nullptr)
@@ -554,6 +563,54 @@ juce::Result GrooveLabProcessor::prepareDragFile (juce::File& file)
 }
 
 //==============================================================================
+juce::Result GrooveLabProcessor::loadUserVoice (const juce::File& file)
+{
+    juce::String err;
+    auto voice = SampleLibrary::loadVoice (file, err);
+    if (voice == nullptr)
+        return juce::Result::fail (err);
+
+    // Keep a private copy so sessions survive the original being moved or deleted.
+    auto stored = file;
+    if (! file.isAChildOf (AppPaths::voicesFolder()))
+    {
+        stored = WavExporter::uniqueFile (AppPaths::voicesFolder(), file.getFileName());
+        if (! file.copyFileTo (stored))
+            stored = file;
+    }
+
+    voice->name = file.getFileNameWithoutExtension();
+    userVoice = voice;
+    userVoiceFile = stored;
+
+    if (auto* p = apvts.getParameter (ParamIDs::instrument (InstrumentId::CustomVoice)))
+    {
+        p->beginChangeGesture();
+        p->setValueNotifyingHost (1.0f);
+        p->endChangeGesture();
+    }
+
+    juce::Logger::writeToLog ("JGL: loaded voice " + file.getFullPathName() + " root " + juce::String (voice->rootMidi, 2)
+                              + (voice->loopStart >= 0 ? " with sustain loop" : " without loop"));
+    statusMessage = "Loaded " + file.getFileName() + ": " + describeUserVoice();
+    paramsDirty.store (true);
+    return juce::Result::ok();
+}
+
+juce::String GrooveLabProcessor::describeUserVoice() const
+{
+    auto v = userVoice;
+    if (v == nullptr)
+        return "No sample loaded";
+    const int nearest = (int) std::lround (v->rootMidi);
+    const int cents = (int) std::lround ((v->rootMidi - nearest) * 100.0);
+    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    juce::String note = juce::String (names[((nearest % 12) + 12) % 12]) + juce::String (nearest / 12 - 1);
+    if (cents != 0) note << (cents > 0 ? " +" : " ") << cents << " cents";
+    return note + (v->loopStart >= 0 ? ", looped sustain" : "");
+}
+
+//==============================================================================
 void GrooveLabProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
@@ -573,6 +630,7 @@ void GrooveLabProcessor::getStateInformation (juce::MemoryBlock& destData)
     extra.setProperty ("exportRate", exportSampleRate, nullptr);
     extra.setProperty ("followHostTempo", followHostTempo, nullptr);
     extra.setProperty ("syncHost", player.isSyncedToHost(), nullptr);
+    extra.setProperty ("voiceFile", userVoiceFile.getFullPathName(), nullptr);
     state.appendChild (extra, nullptr);
 
     if (auto xml = state.createXml())
@@ -609,6 +667,20 @@ void GrooveLabProcessor::setStateInformation (const void* data, int sizeInBytes)
         exportSampleRate = (double) extra.getProperty ("exportRate", 0.0);
         followHostTempo = (bool) extra.getProperty ("followHostTempo", false);
         player.setSyncToHost ((bool) extra.getProperty ("syncHost", true));
+
+        const auto voicePath = extra.getProperty ("voiceFile").toString();
+        if (voicePath.isNotEmpty())
+        {
+            juce::String err;
+            const juce::File vf (voicePath);
+            if (auto v = SampleLibrary::loadVoice (vf, err))
+            {
+                userVoice = v;
+                userVoiceFile = vf;
+            }
+            else
+                juce::Logger::writeToLog ("JGL: could not restore voice sample: " + err);
+        }
     }
 
     apvts.replaceState (tree);

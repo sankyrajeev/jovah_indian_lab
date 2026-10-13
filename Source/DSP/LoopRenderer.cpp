@@ -148,7 +148,7 @@ namespace
         {
             if (const auto* s = lib->pickNote (id, midi, req.seed))
             {
-                SampleLibrary::renderNote (*s, midi, req.velocity, req.durationSec, req.glideFromSemis, req.glideSec, req.sampleRate, out);
+                SampleLibrary::renderNote (*s, midi, req.velocity, req.durationSec, Voices::makePitchCurve (req), req.sampleRate, out);
                 return true;
             }
             return false;
@@ -187,9 +187,19 @@ namespace
 }
 
 //==============================================================================
-double LoopRenderer::tonicMidi (InstrumentId id, int keyRoot)
+double LoopRenderer::tonicMidi (InstrumentId id, int keyRoot, double voiceRoot)
 {
     const int pc = pitchClass (keyRoot);
+    if (id == InstrumentId::CustomVoice)
+    {
+        // Put Sa in the octave that keeps melodies (Sa-5 .. Sa+12) closest to the recording's own pitch.
+        const double centre = voiceRoot > 0.0 ? voiceRoot - 3.0 : 60.0;
+        double best = 60 + pc;
+        for (int oct = 2; oct <= 7; ++oct)
+            if (std::abs ((12 * oct + pc) - centre) < std::abs (best - centre))
+                best = 12 * oct + pc;
+        return best;
+    }
     switch (id)
     {
         case InstrumentId::Sitar:   return 48 + pc;                    // C3 .. B3
@@ -276,13 +286,17 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
 
             if (info.melodic)
             {
-                midi = tonicMidi (id, rs.keyRoot) + e.pitch;
+                midi = tonicMidi (id, rs.keyRoot, opt.userVoice != nullptr ? opt.userVoice->rootMidi : -1.0) + e.pitch;
                 req.frequency = dsp::midiToHz (midi);
                 req.durationSec = std::max (0.03, groove.endSeconds (e, part) - onset);
                 req.glideFromSemis = e.glideFrom;
                 req.glideSec = e.glideBeats * secPerBeat;
                 req.ornament = e.ornament;
                 req.ornamentSemis = e.ornamentPitch - e.pitch;
+                req.fallSemis = e.fallSemis;
+                req.fallStartSec = std::max (0.0, req.durationSec - e.fallBeats * secPerBeat);
+                if (id == InstrumentId::CustomVoice)
+                    req.vibratoSemis = rs.voiceVibrato * 0.45f;
                 onset -= Voices::leadInSeconds (req);
             }
             else if (id != InstrumentId::Dhol && isBassArticulation (id, e.articulation) && nearDagga (onset))
@@ -290,7 +304,15 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
                 req.bassGain = 0.5f;
             }
 
-            if (! renderWithSamples (opt.samples, req, midi, mono))
+            if (id == InstrumentId::CustomVoice)
+            {
+                if (opt.userVoice != nullptr)
+                    SampleLibrary::renderNote (*opt.userVoice, midi, req.velocity, req.durationSec,
+                                               Voices::makePitchCurve (req), sr, mono);
+                else
+                    mono.clear();   // nothing loaded yet
+            }
+            else if (! renderWithSamples (opt.samples, req, midi, mono))
             {
                 if (id == InstrumentId::Tanpura)
                 {
@@ -318,7 +340,7 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
             applyTarab (partBuf, rs.keyRoot, a.scaleIndex, sr);
 
         // Keep the sub range for the drums.
-        if (id == InstrumentId::Tanpura || id == InstrumentId::Sitar || id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram)
+        if (id == InstrumentId::Tanpura || id == InstrumentId::Sitar || id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram || id == InstrumentId::CustomVoice)
             highPassCircular (partBuf, id == InstrumentId::Tanpura ? 85.0 : (id == InstrumentId::Nadaswaram ? 120.0 : 70.0), sr);
 
         const float gain = dsp::dbToGain (info.gainDb);

@@ -31,6 +31,7 @@ public:
         RenderSettings render;
         SeedSet seeds;
         uint64_t id = 0;
+        std::shared_ptr<const SampleLibrary::Sample> userVoice;   // "Your Sample", may be null
     };
 
     GenerationService();

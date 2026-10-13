@@ -6,6 +6,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "../Core/Instruments.h"
+#include "PitchCurve.h"
 
 namespace jgl
 {
@@ -36,7 +37,8 @@ public:
         juce::AudioBuffer<float> data;   // mono
         double sampleRate = 48000.0;
         int layer = 0;
-        int rootMidi = -1;
+        double rootMidi = -1.0;     // fractional: detected tuning of the recording
+        int loopStart = -1, loopEnd = -1;   // sustain loop (melodic), -1 = none
         juce::String name;
     };
 
@@ -57,8 +59,16 @@ public:
 
     /** Renders a sample-based hit / note into `out` (mono), resampled to `sampleRate`. */
     static void renderHit (const Sample& s, float velocity, int numLayers, double sampleRate, std::vector<float>& out);
+    /** Pitch-shifted playback following a pitch curve (glides, gamaka, falls, vibrato), looping
+        the sustain region for notes longer than the recording. */
     static void renderNote (const Sample& s, double targetMidi, float velocity, double durationSec,
-                            float glideFromSemis, double glideSec, double sampleRate, std::vector<float>& out);
+                            const PitchCurve& curve, double sampleRate, std::vector<float>& out);
+
+    /** Detects pitch and a sustain loop for a one-note recording (fills rootMidi if < 0). */
+    static void analyseNote (Sample& s);
+
+    /** Loads any audio file as a melodic voice: mono, trimmed, normalised and analysed. */
+    static std::shared_ptr<Sample> loadVoice (const juce::File& file, juce::String& error);
 
     int numLayers (InstrumentId id, int articulation) const;
 

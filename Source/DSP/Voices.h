@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "../Core/Instruments.h"
+#include "PitchCurve.h"
 
 namespace jgl
 {
@@ -21,6 +22,9 @@ struct VoiceRequest
     double glideSec = 0.0;
     uint8_t ornament = OrnNone;
     double ornamentSemis = 0.0;   // grace note offset relative to the note
+    float fallSemis = 0.0f;       // dive at the end of the note (negative = down)
+    double fallStartSec = 0.0;
+    float vibratoSemis = 0.0f;    // extra vibrato depth (sample-driven voices)
 
     // Percussion
     double tablaSaHz = 277.0;     // dayan tuning (tabla is traditionally tuned to Sa)
@@ -50,6 +54,9 @@ public:
 
     /** How early the sound must start so the main note lands on the beat (grace notes). */
     static double leadInSeconds (const VoiceRequest& request);
+
+    /** Pitch contour for a melodic note: ornaments, glides, falls, vibrato. */
+    static PitchCurve makePitchCurve (const VoiceRequest& request);
 };
 
 } // namespace jgl

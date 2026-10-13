@@ -4,6 +4,7 @@
 
 #include "../Core/MusicTypes.h"
 #include "../Core/Settings.h"
+#include "../DSP/SampleLibrary.h"
 
 namespace jgl
 {
@@ -16,6 +17,7 @@ struct LoopResult
     ComposeSettings compose;
     RenderSettings render;
     SeedSet seeds;
+    std::shared_ptr<const SampleLibrary::Sample> userVoice;   // recording used by "Your Sample"
 
     juce::AudioBuffer<float> audio;          // exact loop length, stereo
     std::vector<float> peakMin, peakMax;     // waveform overview (per bucket, mono)
@@ -34,7 +36,7 @@ struct LoopResult
     static bool isMelodicPart (InstrumentId id) noexcept
     {
         return id == InstrumentId::Sitar || id == InstrumentId::Bansuri
-            || id == InstrumentId::Tumbi || id == InstrumentId::Tanpura || id == InstrumentId::Nadaswaram;
+            || id == InstrumentId::Tumbi || id == InstrumentId::Tanpura || id == InstrumentId::Nadaswaram || id == InstrumentId::CustomVoice;
     }
 
     void computePeaks (int buckets)

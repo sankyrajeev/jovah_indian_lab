@@ -5,11 +5,11 @@
 
 #include "../Core/MusicTypes.h"
 #include "../Core/Settings.h"
+#include "SampleLibrary.h"
 
 namespace jgl
 {
 
-class SampleLibrary;
 
 /**
     Offline renderer: Arrangement + RenderSettings -> exact-length stereo loop.
@@ -28,6 +28,7 @@ public:
     struct Options
     {
         const SampleLibrary* samples = nullptr;
+        const SampleLibrary::Sample* userVoice = nullptr;   // "Your Sample" recording, may be null
         const std::atomic<bool>* cancel = nullptr;
         bool normalise = true;
     };
@@ -37,7 +38,7 @@ public:
                         juce::AudioBuffer<float>& out, const Options& options);
 
     /** MIDI note of Sa for a melodic instrument in the given key. */
-    static double tonicMidi (InstrumentId id, int keyRoot);
+    static double tonicMidi (InstrumentId id, int keyRoot, double voiceRootMidi = -1.0);
 
     /** Dayan (treble tabla) tuning: Sa of the key, kept within the drum's natural range. */
     static double tablaSaHz (int keyRoot);

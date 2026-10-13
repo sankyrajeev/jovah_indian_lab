@@ -39,6 +39,14 @@ InstrumentRow::InstrumentRow (GrooveLabProcessor& p, InstrumentId i) : processor
 
     for (auto* b : { &favButton, &lockButton, &regenButton })
         addAndMakeVisible (b);
+
+    if (id == InstrumentId::CustomVoice)
+    {
+        loadButton.onClick = [this] { if (onLoadSample) onLoadSample(); };
+        settingsButton.onClick = [this] { if (onVoiceSettings) onVoiceSettings(); };
+        addAndMakeVisible (loadButton);
+        addAndMakeVisible (settingsButton);
+    }
     refresh();
 }
 
@@ -101,7 +109,7 @@ void InstrumentRow::paint (juce::Graphics& g)
         decor::drawInstrument (g, id, iconArea);
     }
 
-    auto text = r.withLeft (iconArea.getRight() + 16.0f).withTrimmedRight (90.0f);
+    auto text = r.withLeft (iconArea.getRight() + 16.0f).withTrimmedRight (id == InstrumentId::CustomVoice ? 140.0f : 90.0f);
     g.setColour (Colours::ink);
     g.setFont (Fonts::serif (20.0f, enabled));
     g.drawText (info.name, text.removeFromTop (r.getHeight() * 0.56f).withTrimmedTop (4.0f), juce::Justification::bottomLeft);
@@ -109,6 +117,8 @@ void InstrumentRow::paint (juce::Graphics& g)
     g.setFont (Fonts::serif (15.0f));
     juce::String role = info.role;
     if (usesSamples) role << "  |  samples";
+    if (id == InstrumentId::CustomVoice && processor.getUserVoice() != nullptr)
+        role = processor.getUserVoice()->name.substring (0, 18) + "  |  " + processor.describeUserVoice().upToFirstOccurrenceOf (",", false, false);
     g.drawText (role, text, juce::Justification::topLeft);
 }
 
@@ -117,14 +127,25 @@ void InstrumentRow::resized()
     auto r = getLocalBounds().reduced (6, 0);
     const int s = 26;
     favButton.setBounds (r.removeFromRight (s + 4).withSizeKeepingCentre (s, s));
+    if (id == InstrumentId::CustomVoice)
+    {
+        settingsButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 4, s - 4));
+        loadButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 4, s - 4));
+    }
     regenButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 2, s - 2));
     lockButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 2, s - 2));
 }
 
 void InstrumentRow::mouseUp (const juce::MouseEvent& e)
 {
-    if (e.mouseWasClicked() && attachment != nullptr)
-        attachment->setValueAsCompleteGesture (enabled ? 0.0f : 1.0f);
+    if (! e.mouseWasClicked() || attachment == nullptr)
+        return;
+    if (id == InstrumentId::CustomVoice && processor.getUserVoice() == nullptr && onLoadSample)
+    {
+        onLoadSample();   // nothing to play yet: ask for a sample first
+        return;
+    }
+    attachment->setValueAsCompleteGesture (enabled ? 0.0f : 1.0f);
 }
 
 } // namespace jgl

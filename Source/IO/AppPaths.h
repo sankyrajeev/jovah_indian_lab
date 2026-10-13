@@ -19,6 +19,7 @@ struct AppPaths
     static juce::File exportsFolder();
     static juce::File samplesFolder();
     static juce::File presetsFolder();
+    static juce::File voicesFolder();     // copies of samples loaded into "Your Sample"
     static juce::File settingsFolder();
     static juce::File logFile();
 

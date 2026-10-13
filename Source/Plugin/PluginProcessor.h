@@ -91,6 +91,11 @@ public:
     /** Same as export, but re-uses the file if this exact loop was already written. */
     juce::Result prepareDragFile (juce::File& file);
 
+    /** Loads a single-note recording into "Your Sample" (and enables it). */
+    juce::Result loadUserVoice (const juce::File& file);
+    std::shared_ptr<const SampleLibrary::Sample> getUserVoice() const { return userVoice; }
+    juce::String describeUserVoice() const;
+
     LoopPlayer& getPlayer() noexcept { return player; }
     GenerationService& getService() noexcept { return service; }
     juce::AudioProcessorValueTreeState& getState() noexcept { return apvts; }
@@ -127,6 +132,8 @@ private:
     int historyIndex = -1;
 
     std::shared_ptr<const LoopResult> currentResult;
+    std::shared_ptr<const SampleLibrary::Sample> userVoice;
+    juce::File userVoiceFile;
     uint64_t nextRequestId = 1;
     uint64_t lastRequestedId = 0;
     bool renderPending = false;

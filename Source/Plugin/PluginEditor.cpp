@@ -5,6 +5,7 @@
 #include "../IO/AppPaths.h"
 #include "../IO/PresetManager.h"
 #include "../UI/Decor.h"
+#include "../UI/VoicePanel.h"
 
 namespace jgl
 {
@@ -198,10 +199,17 @@ void GrooveLabEditor::setupEnsemble()
     rowViewport.setScrollBarThickness (6);
     addAndMakeVisible (rowViewport);
 
+    std::vector<InstrumentId> order { InstrumentId::CustomVoice };   // your own sound first
     for (auto id : allInstruments())
+        if (id != InstrumentId::CustomVoice)
+            order.push_back (id);
+
+    for (auto id : order)
     {
         auto* row = rows.add (new InstrumentRow (processor, id));
         row->onFavouriteChanged = [this] { if (favouritesOnly) layoutRows(); };
+        row->onLoadSample = [this] { chooseVoiceSample(); };
+        row->onVoiceSettings = [this] { showVoicePanel(); };
         rowHolder.addAndMakeVisible (row);
     }
 }
@@ -676,6 +684,79 @@ void GrooveLabEditor::paint (juce::Graphics& g)
         g.setFont (Fonts::serif (16.0f, showStatus));
         g.drawText (showStatus ? statusText : loopDetails, b, juce::Justification::topLeft, true);
     }
+}
+
+void GrooveLabEditor::paintOverChildren (juce::Graphics& g)
+{
+    if (! fileDragActive)
+        return;
+    auto r = getLocalBounds().toFloat().reduced (12.0f);
+    g.setColour (Colours::paperLight.withAlpha (0.88f));
+    g.fillRoundedRectangle (r, 18.0f);
+    const float dashes[] = { 8.0f, 6.0f };
+    juce::Path border, dashed;
+    border.addRoundedRectangle (r.reduced (6.0f), 16.0f);
+    juce::PathStrokeType (2.0f).createDashedStroke (dashed, border, dashes, 2);
+    g.setColour (Colours::copper);
+    g.fillPath (dashed);
+    g.strokePath (decor::lotus (juce::Rectangle<float> (120.0f, 90.0f).withCentre (r.getCentre().translated (0.0f, -60.0f))), juce::PathStrokeType (1.6f));
+    g.setColour (Colours::ink);
+    g.setFont (Fonts::serif (34.0f));
+    g.drawText ("Drop a single note", r.withTrimmedTop (r.getHeight() * 0.5f).removeFromTop (44.0f), juce::Justification::centred);
+    g.setColour (Colours::inkSoft);
+    g.setFont (Fonts::serif (19.0f));
+    g.drawText ("Your Sample will play the melodies with it: bends, shakes, falls and all.",
+                r.withTrimmedTop (r.getHeight() * 0.5f + 46.0f).removeFromTop (30.0f), juce::Justification::centred);
+}
+
+bool GrooveLabEditor::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    for (auto& f : files)
+        if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
+            return true;
+    return false;
+}
+
+void GrooveLabEditor::filesDropped (const juce::StringArray& files, int, int)
+{
+    fileDragActive = false;
+    repaint();
+    for (auto& f : files)
+        if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
+        {
+            loadVoice (juce::File (f));
+            return;
+        }
+}
+
+void GrooveLabEditor::loadVoice (const juce::File& f)
+{
+    const auto res = processor.loadUserVoice (f);
+    setStatus (res.wasOk() ? processor.statusMessage : res.getErrorMessage());
+    for (auto* r : rows) r->repaint();
+}
+
+void GrooveLabEditor::chooseVoiceSample()
+{
+    chooser = std::make_unique<juce::FileChooser> ("Choose a single-note sample", juce::File(), "*.wav;*.aif;*.aiff;*.flac");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [this] (const juce::FileChooser& fc)
+    {
+        const auto f = fc.getResult();
+        if (f.existsAsFile())
+            loadVoice (f);
+    });
+}
+
+void GrooveLabEditor::showVoicePanel()
+{
+    auto panel = std::make_unique<VoicePanel> (processor, [this] { chooseVoiceSample(); });
+    panel->setLookAndFeel (&lnf);
+    juce::Rectangle<int> anchor;
+    for (auto* r : rows)
+        if (r->getInstrument() == InstrumentId::CustomVoice)
+            anchor = getLocalArea (r, r->getLocalBounds());
+    juce::CallOutBox::launchAsynchronously (std::move (panel), anchor, this);
 }
 
 void GrooveLabEditor::mouseUp (const juce::MouseEvent& e)

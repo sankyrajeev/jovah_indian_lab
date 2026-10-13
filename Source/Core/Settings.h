@@ -19,11 +19,20 @@ struct ComposeSettings
     float variation = 0.5f;
     std::array<bool, (size_t) numInstruments> enabled {};
 
+    // Expression of the sample-driven voice ("Your Sample")
+    float voiceBend = 0.5f;      // meend glides between notes and scoops into notes
+    float voiceShake = 0.35f;    // gamaka: oscillating ornaments on held notes
+    float voiceFalls = 0.3f;     // pitch dives at phrase ends
+    float voiceStutter = 0.15f;  // rhythmic re-triggers of a note
+    float voiceOctave = 0.2f;    // octave leaps on phrase peaks
+
     bool operator== (const ComposeSettings& o) const noexcept
     {
         return bars == o.bars && scaleIndex == o.scaleIndex && styleIndex == o.styleIndex
             && frameworkIndex == o.frameworkIndex && complexity == o.complexity && density == o.density
-            && energy == o.energy && variation == o.variation && enabled == o.enabled;
+            && energy == o.energy && variation == o.variation && enabled == o.enabled
+            && voiceBend == o.voiceBend && voiceShake == o.voiceShake && voiceFalls == o.voiceFalls
+            && voiceStutter == o.voiceStutter && voiceOctave == o.voiceOctave;
     }
     bool operator!= (const ComposeSettings& o) const noexcept { return ! (*this == o); }
 
@@ -47,6 +56,7 @@ struct RenderSettings
     int delayTime = 1;        // index into delayTimeNames()
     float filter = 0.0f;      // -1 = low-pass .. 0 = off .. +1 = high-pass
     float levelDb = 0.0f;     // master output level applied after normalisation
+    float voiceVibrato = 0.3f; // vibrato depth of the sample-driven voice
     double sampleRate = 48000.0;
 
     bool operator== (const RenderSettings& o) const noexcept
@@ -54,7 +64,7 @@ struct RenderSettings
         return bpm == o.bpm && keyRoot == o.keyRoot && swing == o.swing && groove == o.groove
             && humanize == o.humanize && ghost == o.ghost && accent == o.accent
             && saturation == o.saturation && reverb == o.reverb && delay == o.delay
-            && delayTime == o.delayTime && filter == o.filter && levelDb == o.levelDb
+            && delayTime == o.delayTime && filter == o.filter && levelDb == o.levelDb && voiceVibrato == o.voiceVibrato
             && sampleRate == o.sampleRate;
     }
     bool operator!= (const RenderSettings& o) const noexcept { return ! (*this == o); }

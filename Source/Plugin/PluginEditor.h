@@ -13,6 +13,7 @@ namespace jgl
 
 class GrooveLabEditor : public juce::AudioProcessorEditor,
                         public juce::DragAndDropContainer,
+                        public juce::FileDragAndDropTarget,
                         private juce::ChangeListener,
                         private juce::Timer
 {
@@ -21,9 +22,15 @@ public:
     ~GrooveLabEditor() override;
 
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
+
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void fileDragEnter (const juce::StringArray&, int, int) override { fileDragActive = true; repaint(); }
+    void fileDragExit (const juce::StringArray&) override { fileDragActive = false; repaint(); }
+    void filesDropped (const juce::StringArray& files, int, int) override;
 
     static constexpr int defaultWidth = 1280;
     static constexpr int defaultHeight = 880;
@@ -46,6 +53,9 @@ private:
     void showMainMenu();
     void showStyleMenu();
     void addUtilityItems (juce::PopupMenu& m);
+    void chooseVoiceSample();
+    void showVoicePanel();
+    void loadVoice (const juce::File& f);
     void handleUtilityResult (int r);
     Knob& addKnob (juce::OwnedArray<Knob>& into, const char* paramId, const juce::String& caption, const juce::String& tooltip);
 
@@ -101,6 +111,8 @@ private:
     IconTextButton folderButton { "OPEN FOLDER", decor::Icon::Folder };
     IconButton utilityButton { decor::Icon::Dots, decor::Icon::Dots, "Samples, folders and log" };
 
+    std::unique_ptr<juce::FileChooser> chooser;
+    bool fileDragActive = false;
     juce::String loopTitle, loopDetails, statusText;
     double statusUntil = 0.0;
     int tick = 0;

@@ -297,6 +297,90 @@ namespace
         }
     }
 
+    /**
+        Expression for the sample-driven voice, steered by its own knobs:
+        octave leaps on phrase peaks, meend between notes, scoops, gamaka shakes,
+        falls at phrase ends and rhythmic stutters. Pitches stay in the scale.
+    */
+    void applyVoiceExpression (Part& part, const GenerationContext& ctx, const WalkParams& wp, Rng& rng)
+    {
+        const auto& cs = ctx.settings;
+        const auto& s = *wp.scale;
+        Rng xr = rng.fork (0xE7E7);
+        auto& ev = part.events;
+        std::vector<NoteEvent> out;
+        const int top = wp.pitches.back() + 7;
+
+        for (size_t i = 0; i < ev.size(); ++i)
+        {
+            auto e = ev[i];
+            const NoteEvent* prev = out.empty() ? nullptr : &out.back();
+            const NoteEvent* next = i + 1 < ev.size() ? &ev[i + 1] : nullptr;
+            const bool contiguous = prev != nullptr && e.beat - (prev->beat + prev->length) < 0.3;
+            const bool phraseEnd = next == nullptr || next->beat - (e.beat + e.length) > 0.3;
+            const bool peak = prev != nullptr && next != nullptr && e.pitch > ev[i - 1].pitch && e.pitch >= next->pitch;
+
+            // Octave leap on phrase peaks
+            if (peak && e.pitch + 12 <= top && xr.chance (cs.voiceOctave * 0.7))
+                e.pitch += 12;
+
+            // Meend between notes, or a scoop into the note
+            const int interval = contiguous ? e.pitch - prev->pitch : 0;
+            if (contiguous && interval != 0 && std::abs (interval) <= 12 && xr.chance (0.2 + 0.7 * cs.voiceBend))
+            {
+                e.glideFrom = (float) -interval;
+                e.glideBeats = (float) std::min (e.length * 0.6, 0.1 + 0.4 * cs.voiceBend);
+            }
+            else if (xr.chance (cs.voiceBend * 0.5))
+            {
+                e.glideFrom = (float) -(1 + (int) std::floor (xr.uniform() * (1.0 + 3.0 * cs.voiceBend)));
+                e.glideBeats = (float) (0.06 + 0.16 * cs.voiceBend);
+            }
+
+            // Gamaka shake on held notes
+            if (e.length >= 0.5 && ! phraseEnd && xr.chance (cs.voiceShake * 0.8))
+            {
+                e.ornament = OrnGamaka;
+                e.ornamentPitch = stepInScale (s, e.pitch, 1);
+            }
+
+            // Fall at the end of a phrase
+            if (phraseEnd && xr.chance (0.15 + cs.voiceFalls * 0.85))
+            {
+                e.fallSemis = -(float) (1.0 + std::floor (xr.uniform() * (1.0 + 9.0 * cs.voiceFalls)));
+                e.fallBeats = (float) std::min (e.length * 0.8, 0.2 + 0.6 * cs.voiceFalls);
+            }
+
+            // Stutter: re-trigger the note on a 16th (or 32nd) grid before it settles
+            if (e.length >= 0.5 && xr.chance (cs.voiceStutter * 0.7))
+            {
+                const double step = (cs.voiceStutter > 0.6 && xr.chance (0.4)) ? 0.125 : 0.25;
+                const int hits = juce::jlimit (1, (int) (e.length / step) - 1, 1 + (int) (xr.uniform() * 3.0 * cs.voiceStutter + 0.5));
+                for (int k = 0; k < hits; ++k)
+                {
+                    NoteEvent st = e;
+                    st.beat = e.beat + k * step;
+                    st.length = step * 0.7;
+                    st.velocity = e.velocity * (float) std::pow (0.88, k);
+                    st.fallSemis = 0.0f;
+                    st.ornament = OrnNone;
+                    if (k > 0) st.glideFrom = 0.0f;
+                    st.seed = xr.next32();
+                    out.push_back (st);
+                }
+                e.beat += hits * step;
+                e.length -= hits * step;
+                e.glideFrom = 0.0f;
+                e.seed = xr.next32();
+            }
+
+            out.push_back (e);
+        }
+
+        ev = out;
+        part.summary << " | bends, shakes, falls";
+    }
+
     //==========================================================================
     void generateDrone (Part& part, const GenerationContext& ctx, Rng& rng)
     {
@@ -415,7 +499,7 @@ namespace
         const auto [answerSlot, numAnswerers] = ctx.answerSlot (id);
         const bool hasAnswerer = role == MelodicRole::Lead && numAnswerers > 0;
         const float variation = ctx.settings.variation * (1.0f - 0.5f * ctx.style->repetition);
-        const bool sustained = id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram || mb.legato > 0.6f;
+        const bool sustained = id == InstrumentId::Bansuri || id == InstrumentId::Nadaswaram || id == InstrumentId::CustomVoice || mb.legato > 0.6f;
 
         // Motif rhythm shared by calls and responses.
         const auto& cell = chooseRhythm (ctx, rng, false, sustained);
@@ -580,6 +664,7 @@ juce::Range<int> MelodyGenerator::pitchRange (InstrumentId id, const GenerationC
         case InstrumentId::Sitar:   return { -5, juce::jlimit (7, 17, span) };
         case InstrumentId::Bansuri: return { -3, juce::jlimit (9, 19, span + 2) };
         case InstrumentId::Nadaswaram: return { -5, juce::jlimit (9, 17, span + 3) };
+        case InstrumentId::CustomVoice: return { -5, juce::jlimit (9, 14, span + 2) };
         case InstrumentId::Tumbi:   return { -5, 12 };
         case InstrumentId::Tanpura: return { -12, 0 };
         default:                    return { -5, 12 };
@@ -613,7 +698,7 @@ Part MelodyGenerator::generate (InstrumentId id, uint64_t seed, const Generation
         return part;
 
     const bool riff = role == MelodicRole::Riff
-                   || (ctx.style->melody.hypnoticRiff && role == MelodicRole::Lead && id == InstrumentId::Sitar && rng.chance (0.6));
+                   || (ctx.style->melody.hypnoticRiff && role == MelodicRole::Lead && (id == InstrumentId::Sitar || id == InstrumentId::CustomVoice) && rng.chance (0.6));
 
     if (riff)
         generateRiff (part, id, ctx, wp, rng);
@@ -623,7 +708,10 @@ Part MelodyGenerator::generate (InstrumentId id, uint64_t seed, const Generation
     std::sort (part.events.begin(), part.events.end(),
                [] (const NoteEvent& a, const NoteEvent& b) { return a.beat < b.beat; });
     enforceDirection (part, wp);
-    ornament (part, id, s, ctx.style->melody.ornamentChance * (0.6f + ctx.settings.complexity * 0.8f), rng);
+    if (id == InstrumentId::CustomVoice)
+        applyVoiceExpression (part, ctx, wp, rng);
+    else
+        ornament (part, id, s, ctx.style->melody.ornamentChance * (0.6f + ctx.settings.complexity * 0.8f), rng);
     return part;
 }
 

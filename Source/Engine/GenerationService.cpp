@@ -63,10 +63,12 @@ std::shared_ptr<LoopResult> GenerationService::renderNow (const Request& request
     result->compose = request.compose;
     result->render = request.render;
     result->seeds = request.seeds;
+    result->userVoice = request.userVoice;
     result->arrangement = reuse != nullptr ? *reuse : Arranger::compose (request.compose, request.seeds);
 
     LoopRenderer::Options opt;
     opt.samples = lib;
+    opt.userVoice = request.userVoice.get();
     opt.cancel = cancel;
 
     if (! LoopRenderer::render (result->arrangement, request.render, result->audio, opt))

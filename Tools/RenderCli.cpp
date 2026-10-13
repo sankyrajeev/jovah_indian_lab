@@ -107,6 +107,25 @@ int main (int argc, char* argv[])
     rs.saturation = arg (a, "--saturation", juce::String (style.saturation)).getFloatValue();
     rs.filter = arg (a, "--filter", "0").getFloatValue();
 
+    cs.voiceBend = arg (a, "--bend", "0.5").getFloatValue();
+    cs.voiceShake = arg (a, "--shake", "0.35").getFloatValue();
+    cs.voiceFalls = arg (a, "--falls", "0.3").getFloatValue();
+    cs.voiceStutter = arg (a, "--stutter", "0.15").getFloatValue();
+    cs.voiceOctave = arg (a, "--octave", "0.2").getFloatValue();
+    rs.voiceVibrato = arg (a, "--vibrato", "0.3").getFloatValue();
+
+    const auto voicePath = arg (a, "--voice");
+    if (voicePath.isNotEmpty())
+    {
+        juce::String err;
+        auto v = SampleLibrary::loadVoice (juce::File::getCurrentWorkingDirectory().getChildFile (voicePath), err);
+        if (v == nullptr) { std::cerr << err << "\n"; return 1; }
+        std::cout << "Voice root " << juce::String (v->rootMidi, 2) << " (" << juce::String (440.0 * std::pow (2.0, (v->rootMidi - 69.0) / 12.0), 1)
+                  << " Hz), loop " << v->loopStart << ".." << v->loopEnd << " @ " << v->sampleRate << "\n";
+        req.userVoice = v;
+        cs.enabled[(size_t) toIndex (InstrumentId::CustomVoice)] = true;
+    }
+
     const auto seed = (uint64_t) arg (a, "--seed", "1").getLargeIntValue();
     req.seeds = SeedSet::fromMaster (seed);
 
@@ -189,6 +208,7 @@ int main (int argc, char* argv[])
             juce::AudioBuffer<float> buf;
             LoopRenderer::Options opt;
             opt.normalise = false;
+            opt.userVoice = req.userVoice.get();
             RenderSettings dry = rs;
             dry.reverb = 0; dry.delay = 0; dry.saturation = 0; dry.filter = 0;
             LoopRenderer::render (solo, dry, buf, opt);
@@ -212,6 +232,7 @@ int main (int argc, char* argv[])
             LoopRenderer::Options opt;
             opt.samples = &lib;
             opt.normalise = false;
+            opt.userVoice = req.userVoice.get();
             RenderSettings dry = rs;
             dry.reverb = 0; dry.delay = 0; dry.saturation = 0; dry.filter = 0;
             LoopRenderer::render (solo, dry, buf, opt);

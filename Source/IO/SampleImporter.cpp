@@ -2,6 +2,7 @@
 
 #include "../DSP/SampleLibrary.h"
 #include "WavExporter.h"
+#include "../DSP/SampleAnalysis.h"
 
 #include <algorithm>
 
@@ -131,51 +132,7 @@ int SampleImporter::trimEnd (const juce::AudioBuffer<float>& mono, int start, in
 
 double SampleImporter::estimatePitchHz (const juce::AudioBuffer<float>& mono, double sr)
 {
-    const int n = mono.getNumSamples();
-    const int W = 2048;
-    const int minLag = (int) (sr / 1500.0), maxLag = std::min (W - 1, (int) (sr / 50.0));
-    const auto* d = mono.getReadPointer (0);
-    std::vector<double> estimates;
-
-    for (int start = (int) (0.1 * sr); start + W + maxLag < n && estimates.size() < 12; start += W / 2)
-    {
-        std::vector<double> diff ((size_t) maxLag + 1, 0.0);
-        for (int tau = 1; tau <= maxLag; ++tau)
-        {
-            double s = 0.0;
-            for (int i = 0; i < W; ++i)
-            {
-                const double x = d[start + i] - d[start + i + tau];
-                s += x * x;
-            }
-            diff[(size_t) tau] = s;
-        }
-        // Cumulative mean normalised difference (YIN)
-        double running = 0.0;
-        std::vector<double> cmnd ((size_t) maxLag + 1, 1.0);
-        for (int tau = 1; tau <= maxLag; ++tau)
-        {
-            running += diff[(size_t) tau];
-            cmnd[(size_t) tau] = running > 0.0 ? diff[(size_t) tau] * tau / running : 1.0;
-        }
-        int best = -1;
-        for (int tau = minLag; tau < maxLag; ++tau)
-            if (cmnd[(size_t) tau] < 0.12)
-            {
-                while (tau + 1 < maxLag && cmnd[(size_t) tau + 1] < cmnd[(size_t) tau]) ++tau;
-                best = tau;
-                break;
-            }
-        if (best < 0) continue;
-        const double a = cmnd[(size_t) best - 1], b = cmnd[(size_t) best], c = cmnd[(size_t) best + 1];
-        const double denom = a - 2.0 * b + c;
-        const double refined = best + (std::abs (denom) > 1e-12 ? 0.5 * (a - c) / denom : 0.0);
-        estimates.push_back (sr / refined);
-    }
-
-    if (estimates.empty()) return 0.0;
-    std::sort (estimates.begin(), estimates.end());
-    return estimates[estimates.size() / 2];
+    return SampleAnalysis::estimatePitchHz (mono, sr);
 }
 
 juce::String SampleImporter::noteName (int midi)

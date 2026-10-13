@@ -72,6 +72,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
             return (v < 0 ? juce::String ("LP ") : juce::String ("HP ")) + juce::String (juce::roundToInt (std::abs (v) * 100.0f)) + "%";
         })));
 
+    layout.add (unitParam (voiceBend, "Voice Bend", 0.5f));
+    layout.add (unitParam (voiceShake, "Voice Shake", 0.35f));
+    layout.add (unitParam (voiceFalls, "Voice Falls", 0.3f));
+    layout.add (unitParam (voiceStutter, "Voice Stutter", 0.15f));
+    layout.add (unitParam (voiceOctave, "Voice Octave", 0.2f));
+    layout.add (unitParam (voiceVibrato, "Voice Vibrato", 0.3f));
+
     for (auto id : allInstruments())
     {
         bool on = false;

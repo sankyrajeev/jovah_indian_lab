@@ -651,6 +651,26 @@ void drawInstrument (juce::Graphics& g, InstrumentId id, Rectangle<float> a)
             break;
         }
 
+        case InstrumentId::CustomVoice:
+        {
+            // A recording: waveform inside a copper disc.
+            const float d = std::min (a.getWidth(), a.getHeight()) * 0.95f;
+            auto c = Rectangle<float> (d, d).withCentre (a.getCentre());
+            g.setColour (juce::Colours::black.withAlpha (0.12f));
+            g.fillEllipse (c.translated (1.0f, 2.0f));
+            g.setGradientFill (juce::ColourGradient (Colours::copperLight, c.getX(), c.getY(), Colours::copperDeep, c.getRight(), c.getBottom(), false));
+            g.fillEllipse (c);
+            g.setColour (Colours::paperLight);
+            const float bars[] = { .25f, .55f, .9f, .6f, .35f, .75f, .45f, .2f };
+            for (int i = 0; i < 8; ++i)
+            {
+                const float x = c.getX() + c.getWidth() * (0.2f + 0.085f * (float) i);
+                const float h = c.getHeight() * 0.5f * bars[i];
+                g.fillRoundedRectangle (x - 1.4f, c.getCentreY() - h * 0.5f, 2.8f, h, 1.4f);
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -752,6 +772,15 @@ void drawIcon (juce::Graphics& g, Icon icon, Rectangle<float> a, Colour colour)
             for (int row = 0; row < 3; ++row)
                 for (int col = 0; col < 2; ++col)
                     g.fillEllipse (b.x (0.3f + 0.4f * (float) col) - 2.0f, b.y (0.2f + 0.3f * (float) row) - 2.0f, 4.0f, 4.0f);
+            break;
+        case Icon::Sliders:
+            for (int i = 0; i < 3; ++i)
+            {
+                const float y = b.y (0.2f + 0.3f * (float) i);
+                g.drawLine (b.x (0.05f), y, b.x (0.95f), y, 1.3f);
+                const float kx = b.x (std::array<float, 3> { 0.3f, 0.7f, 0.45f }[(size_t) i]);
+                g.fillEllipse (kx - 3.0f, y - 3.0f, 6.0f, 6.0f);
+            }
             break;
         case Icon::ChevronLeft:
         case Icon::ChevronRight:

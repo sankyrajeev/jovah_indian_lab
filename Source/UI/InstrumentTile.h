@@ -29,6 +29,7 @@ public:
     InstrumentId getInstrument() const noexcept { return id; }
     bool isFavourite() const noexcept { return favButton.getToggleState(); }
     std::function<void()> onFavouriteChanged;
+    std::function<void()> onLoadSample, onVoiceSettings;   // "Your Sample" row only
 
 private:
     void updateButtons();
@@ -40,6 +41,8 @@ private:
     IconButton favButton { decor::Icon::Heart, decor::Icon::HeartFilled, "Favourite" };
     IconButton lockButton { decor::Icon::LockOpen, decor::Icon::LockClosed, "Lock: keep this part when generating" };
     IconButton regenButton { decor::Icon::Regenerate, decor::Icon::Regenerate, "Regenerate only this part" };
+    IconButton loadButton { decor::Icon::Upload, decor::Icon::Upload, "Load a single-note sample (or drag a WAV onto the plugin)" };
+    IconButton settingsButton { decor::Icon::Sliders, decor::Icon::Sliders, "Expression: bend, shake, falls, stutter, octave, vibrato" };
     std::unique_ptr<juce::ParameterAttachment> attachment;
 };
 

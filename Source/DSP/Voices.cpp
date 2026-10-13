@@ -1,5 +1,6 @@
 #include "Voices.h"
 #include "DspUtils.h"
+#include "PitchCurve.h"
 
 #include <algorithm>
 
@@ -13,50 +14,6 @@ namespace
     //==========================================================================
     // Pitch curve for melodic notes: glide (meend), initial pitch offset (string
     // tension "kick" / breath scoop) and grace-note ornaments.
-    struct PitchCurve
-    {
-        double glideFrom = 0.0, glideSec = 0.0;
-        double initialSemis = 0.0, initialTau = 0.03;
-        std::vector<std::pair<double, double>> points;   // (time, semis) held values, last one ends at 0
-        double ramp = 0.014;
-        double gamakaDepth = 0.0, gamakaRate = 6.5, gamakaStart = 0.12, gamakaEnd = 0.0;
-
-        double semis (double t) const noexcept
-        {
-            double s = 0.0;
-
-            if (! points.empty())
-            {
-                // Held values with a smooth ramp into each change point.
-                double v = points.front().second;
-                for (size_t i = 1; i < points.size(); ++i)
-                {
-                    const double c = points[i].first;
-                    if (t >= c) { v = points[i].second; continue; }
-                    if (t > c - ramp) v += (points[i].second - v) * smoothstep ((t - (c - ramp)) / ramp);
-                    break;
-                }
-                s += v;
-            }
-
-            if (glideSec > 0.0 && glideFrom != 0.0)
-                s += glideFrom * (1.0 - smoothstep (t / glideSec));
-
-            if (initialSemis != 0.0)
-                s += initialSemis * std::exp (-t / initialTau);
-
-            // Gamaka: the note swings up to its neighbour and back, easing in and out.
-            if (gamakaDepth != 0.0 && t > gamakaStart && t < gamakaEnd)
-            {
-                const double u = t - gamakaStart;
-                const double fade = std::min (1.0, u / 0.08) * std::min (1.0, (gamakaEnd - t) / 0.08);
-                s += gamakaDepth * fade * 0.5 * (1.0 - std::cos (twoPi * gamakaRate * u));
-            }
-
-            return s;
-        }
-    };
-
     struct Formant { double hz, bw, gain; };
 
     struct HarmonicSpec
@@ -548,32 +505,7 @@ namespace
 
     //==========================================================================
     // Melodic instruments
-    PitchCurve makePitchCurve (const VoiceRequest& r)
-    {
-        PitchCurve pc;
-        pc.glideFrom = r.glideFromSemis;
-        pc.glideSec = r.glideSec;
-
-        if (r.ornament == OrnKan)
-        {
-            pc.points = { { 0.0, r.ornamentSemis }, { 0.045, 0.0 } };
-            pc.ramp = 0.018;
-        }
-        else if (r.ornament == OrnGamaka)
-        {
-            pc.gamakaDepth = r.ornamentSemis;
-            pc.gamakaRate = 6.0;
-            pc.gamakaStart = std::min (0.15, r.durationSec * 0.25);
-            pc.gamakaEnd = std::max (pc.gamakaStart, r.durationSec * 0.85);
-        }
-        else if (r.ornament == OrnMurki)
-        {
-            const double up = r.ornamentSemis;
-            pc.points = { { 0.0, up }, { 0.04, 0.0 }, { 0.08, -std::max (1.0, up * 0.5) }, { 0.12, 0.0 } };
-            pc.ramp = 0.012;
-        }
-        return pc;
-    }
+    PitchCurve makePitchCurve (const VoiceRequest& r) { return Voices::makePitchCurve (r); }
 
     void renderSitar (std::vector<float>& out, const VoiceRequest& r, Rng& rng)
     {
@@ -771,6 +703,46 @@ namespace
 }
 
 //==============================================================================
+PitchCurve Voices::makePitchCurve (const VoiceRequest& r)
+{
+    PitchCurve pc;
+    pc.glideFrom = r.glideFromSemis;
+    pc.glideSec = r.glideSec;
+
+    if (r.ornament == OrnKan)
+    {
+        pc.points = { { 0.0, r.ornamentSemis }, { 0.045, 0.0 } };
+        pc.ramp = 0.018;
+    }
+    else if (r.ornament == OrnGamaka)
+    {
+        pc.gamakaDepth = r.ornamentSemis;
+        pc.gamakaRate = 6.0;
+        pc.gamakaStart = std::min (0.15, r.durationSec * 0.25);
+        pc.gamakaEnd = std::max (pc.gamakaStart, r.durationSec * 0.85);
+    }
+    else if (r.ornament == OrnMurki)
+    {
+        const double up = r.ornamentSemis;
+        pc.points = { { 0.0, up }, { 0.04, 0.0 }, { 0.08, -std::max (1.0, up * 0.5) }, { 0.12, 0.0 } };
+        pc.ramp = 0.012;
+    }
+    if (r.fallSemis != 0.0f)
+    {
+        pc.fallSemis = r.fallSemis;
+        pc.fallStart = r.fallStartSec;
+        pc.fallEnd = r.durationSec + 0.05;
+    }
+    if (r.vibratoSemis > 0.0f)
+    {
+        pc.vibratoSemis = r.vibratoSemis;
+        pc.vibratoRate = 5.2 + 1.2 * ((r.seed >> 8) % 100) / 100.0;
+        pc.vibratoDelay = std::min (0.25, r.durationSec * 0.3);
+        pc.vibratoPhase = (double) (r.seed % 628) / 100.0;
+    }
+    return pc;
+}
+
 double Voices::leadInSeconds (const VoiceRequest& r)
 {
     switch (r.ornament)

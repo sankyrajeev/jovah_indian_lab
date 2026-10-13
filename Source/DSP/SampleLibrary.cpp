@@ -1,6 +1,8 @@
 #include "SampleLibrary.h"
 #include "../Core/Rng.h"
 #include "DspUtils.h"
+#include "PitchCurve.h"
+#include "SampleAnalysis.h"
 
 namespace jgl
 {
@@ -130,6 +132,7 @@ int SampleLibrary::load (const juce::File& root)
                 if (auto s = loadFile (fm, f))
                 {
                     s->rootMidi = rootNote;
+                    analyseNote (*s);
                     samples[{ toIndex (id), -1 }].push_back (std::move (s));
                     ++total;
                 }
@@ -241,32 +244,105 @@ void SampleLibrary::renderHit (const Sample& s, float velocity, int numLayers, d
 }
 
 void SampleLibrary::renderNote (const Sample& s, double targetMidi, float velocity, double durationSec,
-                                float glideFromSemis, double glideSec, double sampleRate, std::vector<float>& out)
+                                const PitchCurve& curve, double sampleRate, std::vector<float>& out)
 {
-    const double release = 0.04;
+    const double release = 0.06;
     const int len = (int) ((durationSec + release) * sampleRate);
     out.assign ((size_t) std::max (0, len), 0.0f);
 
+    const int n = s.data.getNumSamples();
+    const bool canLoop = s.loopStart >= 0 && s.loopEnd > s.loopStart && s.loopEnd < n;
+    const double loopLen = canLoop ? (double) (s.loopEnd - s.loopStart) : 0.0;
+    const double xf = canLoop ? std::min (0.03 * s.sampleRate, loopLen / 3.0) : 0.0;
+
     const double baseRatio = s.sampleRate / sampleRate;
     const float gain = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 1.2f);
+    const double root = s.rootMidi > 0.0 ? s.rootMidi : targetMidi;
     double pos = 0.0;
 
     for (int i = 0; i < len; ++i)
     {
         const double t = i / sampleRate;
-        double semis = targetMidi - s.rootMidi;
-        if (glideSec > 0.0)
-            semis += glideFromSemis * (1.0 - dsp::smoothstep (t / glideSec));
+        const double semis = targetMidi - root + curve.semis (t);
 
         float env = 1.0f;
         if (t > durationSec)
             env = (float) std::max (0.0, 1.0 - (t - durationSec) / release);
 
-        out[(size_t) i] = readInterpolated (s.data, pos) * gain * env;
+        float v;
+        if (canLoop && pos >= s.loopEnd - xf)
+        {
+            // Crossfade the loop end into the matching point before the loop start.
+            const double a = juce::jlimit (0.0, 1.0, (s.loopEnd - pos) / xf);
+            v = (float) (a * readInterpolated (s.data, pos) + (1.0 - a) * readInterpolated (s.data, pos - loopLen));
+        }
+        else
+        {
+            v = readInterpolated (s.data, pos);
+        }
+
+        out[(size_t) i] = v * gain * env;
         pos += baseRatio * std::pow (2.0, semis / 12.0);
-        if (pos >= s.data.getNumSamples() - 1)
+
+        if (canLoop && pos >= s.loopEnd)
+            pos -= loopLen;
+        if (pos >= n - 1)
             break;
     }
+}
+
+void SampleLibrary::analyseNote (Sample& s)
+{
+    const auto loop = SampleAnalysis::findSustainLoop (s.data, s.sampleRate);
+    if (loop.medianMidi > 0.0 && (s.rootMidi < 0.0 || std::abs (loop.medianMidi - s.rootMidi) < 1.0))
+        s.rootMidi = loop.medianMidi;   // use the measured tuning (e.g. a slightly flat instrument)
+    if (s.rootMidi < 0.0)
+    {
+        const double hz = SampleAnalysis::estimatePitchHz (s.data, s.sampleRate);
+        if (hz > 0.0) s.rootMidi = SampleAnalysis::hzToMidi (hz);
+    }
+    s.loopStart = loop.start;
+    s.loopEnd = loop.end;
+}
+
+std::shared_ptr<SampleLibrary::Sample> SampleLibrary::loadVoice (const juce::File& file, juce::String& error)
+{
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    auto s = loadFile (fm, file);
+    if (s == nullptr)
+    {
+        error = "Could not read " + file.getFileName() + " (WAV, AIFF or FLAC)";
+        return nullptr;
+    }
+
+    // Trim leading silence (keep 2 ms) and normalise to -3 dBFS.
+    const float peak = s->data.getMagnitude (0, s->data.getNumSamples());
+    if (peak <= 1.0e-5f)
+    {
+        error = file.getFileName() + " is silent";
+        return nullptr;
+    }
+    const auto* d = s->data.getReadPointer (0);
+    int start = 0;
+    while (start < s->data.getNumSamples() && std::abs (d[start]) < peak * 0.01f) ++start;
+    start = std::max (0, start - (int) (0.002 * s->sampleRate));
+    if (start > 0)
+    {
+        juce::AudioBuffer<float> trimmed (1, s->data.getNumSamples() - start);
+        trimmed.copyFrom (0, 0, s->data, 0, start, trimmed.getNumSamples());
+        s->data = std::move (trimmed);
+    }
+    s->data.applyGain (juce::Decibels::decibelsToGain (-3.0f) / peak);
+
+    s->rootMidi = -1.0;
+    analyseNote (*s);
+    if (s->rootMidi <= 0.0)
+    {
+        error = "No clear pitch found in " + file.getFileName() + ". Use a single sustained note.";
+        return nullptr;
+    }
+    return std::shared_ptr<Sample> (std::move (s));
 }
 
 juce::StringArray SampleLibrary::describe() const
