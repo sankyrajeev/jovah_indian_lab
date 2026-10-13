@@ -135,6 +135,35 @@ int main (int argc, char* argv[])
         }
     }
 
+    if (a.contains ("--grid"))
+    {
+        // Drum-machine style view on a 16th grid: letter = stroke, UPPER = accent, ',' = ghost.
+        for (auto& p : result->arrangement.parts)
+        {
+            const auto& info = instrumentInfo (p.instrument);
+            std::cout << juce::String (info.name).paddedRight (' ', 9) << " ";
+            for (int bar = 0; bar < result->arrangement.bars; ++bar)
+            {
+                juce::String line = juce::String::repeatedString (".", 16);
+                for (auto& e : p.events)
+                {
+                    if (e.beat < bar * 4.0 || e.beat >= bar * 4.0 + 4.0) continue;
+                    const int step = (int) std::floor ((e.beat - bar * 4.0) * 4.0 + 1.0e-6);
+                    juce::juce_wchar c = 'x';
+                    if (! info.patternChars.empty())
+                        c = (juce::juce_wchar) info.patternChars[(size_t) juce::jlimit (0, (int) info.patternChars.size() - 1, e.articulation)];
+                    else
+                        c = (juce::juce_wchar) ("0123456789ab" [((e.pitch % 12) + 12) % 12]);
+                    if (e.dyn == Dynamic::Accent) c = juce::CharacterFunctions::toUpperCase (c);
+                    if (e.dyn == Dynamic::Ghost) c = ',';
+                    line = line.substring (0, step) + juce::String::charToString (c) + line.substring (step + 1);
+                }
+                std::cout << line.substring (0, 4) << " " << line.substring (4, 8) << " " << line.substring (8, 12) << " " << line.substring (12) << " | ";
+            }
+            std::cout << "\n";
+        }
+    }
+
     const auto out = juce::File::getCurrentWorkingDirectory().getChildFile (arg (a, "--out", "loop.wav"));
     const auto depth = (WavBitDepth) arg (a, "--depth", "0").getIntValue();
     const bool melodic = result->hasMelodic();

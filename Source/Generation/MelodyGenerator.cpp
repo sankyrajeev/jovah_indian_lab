@@ -166,20 +166,23 @@ namespace
     int upperNeighbour (const ScaleProfile& s, int p) { return stepInScale (s, p, 1); }
     int lowerNeighbour (const ScaleProfile& s, int p) { return stepInScale (s, p, -1); }
 
-    /** Pick a call's ending note: something open (Pa, samvadi, vadi, Re) inside the range. */
-    int callEnding (const ScaleProfile& s, const std::vector<int>& pitches, Rng& rng)
+    /** Pick a call's ending note: something open (Pa, samvadi, vadi, Re), in the octave closest to `near`. */
+    int callEnding (const ScaleProfile& s, const std::vector<int>& pitches, int near, Rng& rng)
     {
         std::vector<int> options;
+        std::vector<double> weights;
         for (int pc : { 7, s.samvadi, s.vadi, 2, 4, 3 })
-            for (int oct : { 0, 12 })
+            for (int oct : { -12, 0, 12 })
             {
                 const int p = pc + oct;
-                if (pc != 0 && scaleContains (s, p) && std::find (pitches.begin(), pitches.end(), p) != pitches.end())
-                    options.push_back (p);
+                if (pc == 0 || ! scaleContains (s, p) || std::find (pitches.begin(), pitches.end(), p) == pitches.end())
+                    continue;
+                options.push_back (p);
+                weights.push_back (std::exp (-std::abs (p - near) / 3.0) * (pc == 7 || pc == s.samvadi ? 1.5 : 1.0));
             }
         if (options.empty())
             return nearestInSet (pitches, 7);
-        return options[(size_t) rng.integer ((int) options.size())];
+        return options[(size_t) std::max (0, rng.weightedIndex (weights))];
     }
 
     //==========================================================================
@@ -459,7 +462,7 @@ namespace
             const bool finalSegment = seg >= segments - 2;
             int endTarget;
             if (isCall && role == MelodicRole::Lead)
-                endTarget = callEnding (s, wp.pitches, segRng);
+                endTarget = callEnding (s, wp.pitches, prev + 3, segRng);
             else
                 endTarget = nearestInSet (wp.pitches, (prev > 9 && ! finalSegment) ? 12 : 0);
 

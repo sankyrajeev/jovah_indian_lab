@@ -286,13 +286,14 @@ namespace
         }
     }
 
-    /** Small musical edits used to create A', A'' variations. */
+    /** Small musical edits used to create A', A'' variations. Counts only edits that change something. */
     void mutate (Bar& bar, InstrumentId id, float amount, float complexity, Rng& rng, const Framework& fw)
     {
         const int n = (int) bar.size();
-        const int ops = (int) std::floor (amount * (1.0f + complexity * 2.5f) + rng.uniform() * 0.8);
+        const int wanted = (int) std::floor (amount * (1.0f + complexity * 2.5f) + rng.uniform() * 0.8 + (amount > 0.15f ? 0.5 : 0.0));
+        int done = 0;
 
-        for (int k = 0; k < ops; ++k)
+        for (int attempt = 0; attempt < wanted * 8 && done < wanted; ++attempt)
         {
             const int s = 1 + rng.integer (n - 1);   // never touch the downbeat
             auto& st = bar[(size_t) s];
@@ -304,16 +305,21 @@ namespace
                 case 0: // displace a weak hit by one step
                     if (st.hit && st.dyn != Dynamic::Accent)
                     {
-                        const int dir = rng.chance (0.5) ? 1 : -1;
-                        const int t = s + dir;
+                        const int t = s + (rng.chance (0.5) ? 1 : -1);
                         if (t > 0 && t < n && ! bar[(size_t) t].hit)
+                        {
                             std::swap (bar[(size_t) t], st);
+                            ++done;
+                        }
                     }
                     break;
 
                 case 1: // change stroke colour
                     if (st.hit)
-                        st.articulation = siblingArticulation (id, st.articulation);
+                    {
+                        const int sib = siblingArticulation (id, st.articulation);
+                        if (sib != st.articulation) { st.articulation = sib; ++done; }
+                    }
                     break;
 
                 case 2: // add a ghost
@@ -322,26 +328,96 @@ namespace
                         st.hit = true;
                         st.dyn = Dynamic::Ghost;
                         st.articulation = ghostArticulation (id, s);
+                        ++done;
                     }
                     break;
 
                 case 3: // drop a weak hit (space is part of the groove)
                     if (st.hit && st.dyn != Dynamic::Accent && w < 0.5f)
+                    {
                         st = Step();
+                        ++done;
+                    }
                     break;
 
                 default: // syncopated accent
                     if (st.hit && st.dyn == Dynamic::Normal && w < 0.4f)
+                    {
                         st.dyn = Dynamic::Accent;
+                        ++done;
+                    }
                     else if (! st.hit && w < 0.3f && rng.chance (0.5))
                     {
                         st.hit = true;
                         st.dyn = Dynamic::Normal;
                         st.articulation = fillerArticulation (id, w, s);
+                        ++done;
                     }
                     break;
             }
         }
+    }
+
+    /**
+        Tihai: a short motif played three times so the final stroke lands on the next downbeat's
+        doorstep (3m + 2g = steps, m = motif length, g = gap). Returns false if no shape fits.
+    */
+    bool applyTihai (Bar& bar, InstrumentId id, int fillSteps, float energy, Rng& rng)
+    {
+        std::vector<std::vector<int>> motifs;
+        switch (id)
+        {
+            case InstrumentId::Tabla:
+                motifs = { { TablaArt::Dha }, { TablaArt::Dha, TablaArt::Te }, { TablaArt::Dha, TablaArt::Te, TablaArt::Te },
+                           { TablaArt::Te, TablaArt::Re, TablaArt::Ka, TablaArt::Dha }, { TablaArt::Na, TablaArt::Dha } };
+                break;
+            case InstrumentId::Dhol:
+                motifs = { { DholArt::Both }, { DholArt::Both, DholArt::Tilli }, { DholArt::Dagga, DholArt::Tilli, DholArt::Tilli } };
+                break;
+            case InstrumentId::Dholak:
+                motifs = { { DholakArt::Ge }, { DholakArt::Ge, DholakArt::Na }, { DholakArt::Ta, DholakArt::Na, DholakArt::Ge } };
+                break;
+            case InstrumentId::Taali:
+                motifs = { { TaaliArt::Clap }, { TaaliArt::Clap, TaaliArt::Clap } };
+                break;
+            case InstrumentId::Manjira:
+                motifs = { { ManjiraArt::Open }, { ManjiraArt::Closed, ManjiraArt::Open } };
+                break;
+            default:
+                return false;
+        }
+
+        std::vector<std::pair<int, int>> shapes;   // (motif index, gap)
+        for (int mi = 0; mi < (int) motifs.size(); ++mi)
+        {
+            const int m = (int) motifs[(size_t) mi].size();
+            const int rest = fillSteps - 3 * m;
+            if (rest >= 0 && rest % 2 == 0 && rest / 2 <= 3)
+                shapes.push_back ({ mi, rest / 2 });
+        }
+        if (shapes.empty())
+            return false;
+
+        const auto shape = shapes[(size_t) rng.integer ((int) shapes.size())];
+        const auto& motif = motifs[(size_t) shape.first];
+        const int m = (int) motif.size(), g = shape.second;
+        const int n = (int) bar.size();
+        const int start = n - fillSteps;
+
+        for (int s = start; s < n; ++s)
+            bar[(size_t) s] = Step();
+
+        for (int rep = 0; rep < 3; ++rep)
+            for (int k = 0; k < m; ++k)
+            {
+                auto& st = bar[(size_t) (start + rep * (m + g) + k)];
+                st.hit = true;
+                st.articulation = motif[(size_t) k];
+                const bool lastStrike = rep == 2 && k == m - 1;
+                st.dyn = (k == 0 || lastStrike) ? Dynamic::Accent : Dynamic::Normal;
+                st.velocity = juce::jlimit (0.3f, 1.0f, 0.62f + 0.12f * (float) rep + (k == 0 ? 0.1f : 0.0f) + 0.1f * energy);
+            }
+        return true;
     }
 
     /** Phrase-end fill over the last `fillSteps` steps, crescendo into the next downbeat. */
@@ -349,7 +425,13 @@ namespace
     {
         const int n = (int) bar.size();
         fillSteps = juce::jlimit (1, n - 1, fillSteps);
+
+        // Tihai cadences for the drums that speak bols.
+        if (fillSteps >= 5 && rng.chance (0.3 + 0.35 * complexity) && applyTihai (bar, id, fillSteps, energy, rng))
+            return;
+
         const int start = n - fillSteps;
+        const int variant = rng.integer (3);   // fill shape
 
         for (int s = start; s < n; ++s)
             bar[(size_t) s] = Step();
@@ -378,17 +460,22 @@ namespace
                 case InstrumentId::Tabla:
                 {
                     static const int tirakita[] = { TablaArt::Te, TablaArt::Re, TablaArt::Ka, TablaArt::Na };
+                    static const int dhere[]    = { TablaArt::Te, TablaArt::Re, TablaArt::Te, TablaArt::Re };
+                    static const int gumki[]    = { TablaArt::Ghe, TablaArt::Na, TablaArt::Na, TablaArt::Tin };
+                    const int* seq = variant == 0 ? tirakita : (variant == 1 ? dhere : gumki);
                     if (last)                                        set (s, TablaArt::Dha, Dynamic::Accent, 0.95f);
                     else if (groupStart && rng.chance (0.35 + complexity * 0.4))
-                                                                     set (s, TablaArt::Dha, Dynamic::Accent, vel);
-                    else                                             set (s, tirakita[i % 4], Dynamic::Normal, vel, allowRoll && (i % 2 == 1));
+                                                                     set (s, variant == 2 ? TablaArt::Ghe : TablaArt::Dha, Dynamic::Accent, vel);
+                    else                                             set (s, seq[i % 4], Dynamic::Normal, vel, allowRoll && (i % 2 == 1));
                     break;
                 }
                 case InstrumentId::Dhol:
                 {
-                    if (last)                        set (s, DholArt::Both, Dynamic::Accent, 1.0f);
-                    else if (i % 3 == 0 && energy > 0.45f) set (s, DholArt::Dagga, Dynamic::Normal, vel);
-                    else                             set (s, DholArt::Tilli, Dynamic::Normal, vel, allowRoll && i >= fillSteps - 3);
+                    if (last)                                              set (s, DholArt::Both, Dynamic::Accent, 1.0f);
+                    else if (variant == 0 && i % 3 == 0 && energy > 0.45f) set (s, DholArt::Dagga, Dynamic::Normal, vel);
+                    else if (variant == 1 && i % 2 == 0)                   set (s, DholArt::Both, Dynamic::Normal, vel);
+                    else if (variant == 2)                                 set (s, DholArt::Tilli, Dynamic::Normal, vel, i >= fillSteps / 2);
+                    else                                                   set (s, DholArt::Tilli, Dynamic::Normal, vel, allowRoll && i >= fillSteps - 3);
                     break;
                 }
                 case InstrumentId::Dholak:

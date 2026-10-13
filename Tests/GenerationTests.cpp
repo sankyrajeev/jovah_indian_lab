@@ -161,25 +161,29 @@ public:
 
         beginTest ("Phrases have fills at the end and repetition inside");
         {
-            int lastBeatHits = 0, firstBarLastBeatHits = 0, identicalBar1And3 = 0, trials = 0;
-            for (uint64_t seed = 1; seed <= 20; ++seed)
-            {
-                const auto cs = test::compose ((int) StyleId::PeakTimePercussion, { InstrumentId::Tabla });
-                const auto a = Arranger::compose (cs, SeedSet::fromMaster (seed));
-                const auto& p = a.parts.front();
-                std::vector<double> bar1, bar3;
-                for (auto& e : p.events)
+            int fills = 0, identicalBar1And3 = 0, trials = 0;
+            for (int style : { (int) StyleId::PeakTimePercussion, (int) StyleId::TribalRitual, (int) StyleId::FolkElectronica })
+                for (uint64_t seed = 1; seed <= 20; ++seed)
                 {
-                    if (e.beat >= 15.0) ++lastBeatHits;
-                    if (e.beat >= 3.0 && e.beat < 4.0) ++firstBarLastBeatHits;
-                    if (e.beat < 4.0) bar1.push_back (e.beat);
-                    if (e.beat >= 8.0 && e.beat < 12.0) bar3.push_back (e.beat - 8.0);
+                    const auto cs = test::compose (style, { InstrumentId::Tabla, InstrumentId::Dhol });
+                    const auto a = Arranger::compose (cs, SeedSet::fromMaster (seed));
+                    for (auto& p : a.parts)
+                    {
+                        auto beatsIn = [&p] (double from, double to)
+                        {
+                            std::vector<std::pair<double, int>> v;
+                            for (auto& e : p.events)
+                                if (e.beat >= from && e.beat < to)
+                                    v.push_back ({ e.beat - from, e.articulation * 4 + (int) e.dyn });
+                            return v;
+                        };
+                        fills += beatsIn (12.0, 16.0) != beatsIn (0.0, 4.0) ? 1 : 0;              // phrase end differs
+                        identicalBar1And3 += beatsIn (0.0, 4.0) == beatsIn (8.0, 12.0) ? 1 : 0;   // motif returns
+                        ++trials;
+                    }
                 }
-                identicalBar1And3 += bar1 == bar3 ? 1 : 0;
-                ++trials;
-            }
-            expectGreaterThan (lastBeatHits, firstBarLastBeatHits);   // phrase-end fills
-            expectGreaterThan (identicalBar1And3, trials / 3);          // motif repetition (A ... A)
+            expectGreaterThan (fills, trials * 9 / 10);
+            expectGreaterThan (identicalBar1And3, trials / 3);
         }
 
         beginTest ("Seed sets round-trip through text");
