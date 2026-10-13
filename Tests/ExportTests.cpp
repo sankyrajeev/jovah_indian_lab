@@ -28,6 +28,8 @@ public:
             info.keyLabel = keyLabel (2, 1);
             info.bars = 4;
             expectEquals (WavExporter::makeFileName (info), juce::String ("IndianGroove_AfroIndian_124BPM_Dmin_4Bars.wav"));
+            info.keyLabel = keyLabel (1, 9);
+            expectEquals (WavExporter::makeFileName (info), juce::String ("IndianGroove_AfroIndian_124BPM_C#Bhairav_4Bars.wav"));
             info.keyLabel = {};
             info.bars = 1;
             info.bpm = 127.5;

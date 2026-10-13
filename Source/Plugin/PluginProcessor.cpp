@@ -462,7 +462,7 @@ juce::String GrooveLabProcessor::getLoopTitle() const
     if (r->hasMelodic())
         t << "  in  " << keyNames()[r->render.keyRoot] << " " << scaleProfile (r->compose.scaleIndex).name;
     else
-        t << "  percussion";
+        t << "  |  percussion only";
     return t;
 }
 

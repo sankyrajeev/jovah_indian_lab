@@ -99,7 +99,8 @@ juce::String WavExporter::makeFileName (const LoopFileInfo& info)
     if (info.keyLabel.isNotEmpty())
         name << info.keyLabel << "_";
     name << info.bars << (info.bars == 1 ? "Bar" : "Bars") << ".wav";
-    return juce::File::createLegalFileName (name);
+    // Keep '#' (C#, F# ...), which juce::File::createLegalFileName would strip; it is valid on macOS, Windows and Linux.
+    return name.removeCharacters ("/\\:*?\"<>|");
 }
 
 juce::File WavExporter::uniqueFile (const juce::File& folder, const juce::String& fileName)
