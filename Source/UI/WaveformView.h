@@ -12,7 +12,10 @@ class GrooveLabProcessor;
 bool startLoopFileDrag (GrooveLabProcessor& processor, juce::Component* source,
                         std::function<void (const juce::String&)> status);
 
-/** Waveform overview with bar grid and playhead. The whole view is a drag source for the WAV. */
+/**
+    Dark waveform strip with bar numbers and a playhead. The whole strip (and the grip
+    on its right) is a drag source for the loop's WAV file; a click toggles playback.
+*/
 class WaveformView : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -29,30 +32,15 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
 
 private:
+    juce::Rectangle<float> gripArea() const;
+
     GrooveLabProcessor& processor;
     std::shared_ptr<const LoopResult> result;
     float playhead = -1.0f;
     bool busy = false;
-    bool dragStarted = false;
-};
-
-/** Explicit "drag me" handle next to the waveform. */
-class DragHandle : public juce::Component, public juce::SettableTooltipClient
-{
-public:
-    explicit DragHandle (GrooveLabProcessor& p);
-    std::function<void (const juce::String&)> onStatus;
-
-    void paint (juce::Graphics&) override;
-    void mouseDrag (const juce::MouseEvent&) override;
-    void mouseUp (const juce::MouseEvent&) override { dragStarted = false; }
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
-
-private:
-    GrooveLabProcessor& processor;
     bool dragStarted = false;
 };
 

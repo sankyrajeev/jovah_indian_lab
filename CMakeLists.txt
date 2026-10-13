@@ -61,7 +61,10 @@ set(JGL_PLUGIN_SOURCES
     Source/Plugin/PluginEditor.cpp
     Source/UI/Theme.cpp
     Source/UI/InstrumentTile.cpp
-    Source/UI/WaveformView.cpp)
+    Source/UI/WaveformView.cpp
+    Source/UI/Decor.cpp
+    Source/UI/Widgets.cpp
+    Source/IO/UserSettings.cpp)
 
 set(JGL_COMMON_DEFINITIONS
     JUCE_WEB_BROWSER=0
@@ -86,6 +89,12 @@ set(JGL_JUCE_MODULES
     juce::juce_audio_utils
     juce::juce_audio_formats
     juce::juce_dsp)
+
+# Bundled typefaces (SIL Open Font License, see Resources/Fonts/OFL-*.txt)
+juce_add_binary_data(JGLBinaryData SOURCES
+    Resources/Fonts/CormorantGaramond-Medium.ttf
+    Resources/Fonts/CormorantGaramond-Bold.ttf
+    Resources/Fonts/Cinzel-Medium.ttf)
 
 # ---------------------------------------------------------------------------
 # Plugin: VST3 + Standalone everywhere, AU on macOS
@@ -117,7 +126,7 @@ target_sources(JovahGrooveLab PRIVATE ${JGL_ENGINE_SOURCES} ${JGL_PLUGIN_SOURCES
 target_include_directories(JovahGrooveLab PRIVATE Source)
 target_compile_definitions(JovahGrooveLab PUBLIC ${JGL_COMMON_DEFINITIONS} JUCE_MODAL_LOOPS_PERMITTED=0)
 target_link_libraries(JovahGrooveLab
-    PRIVATE ${JGL_JUCE_MODULES}
+    PRIVATE ${JGL_JUCE_MODULES} JGLBinaryData
     PUBLIC juce::juce_recommended_config_flags
            juce::juce_recommended_lto_flags
            juce::juce_recommended_warning_flags)
@@ -142,7 +151,7 @@ if(JGL_BUILD_TESTS)
     target_include_directories(JGLTests PRIVATE Source)
     target_compile_definitions(JGLTests PRIVATE ${JGL_COMMON_DEFINITIONS} JGL_UNIT_TESTS=1 JUCE_MODAL_LOOPS_PERMITTED=1)
         target_link_libraries(JGLTests
-        PRIVATE ${JGL_JUCE_MODULES}
+        PRIVATE ${JGL_JUCE_MODULES} JGLBinaryData
                 juce::juce_recommended_config_flags
                 juce::juce_recommended_warning_flags)
     add_test(NAME JGLTests COMMAND JGLTests)

@@ -2,46 +2,44 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../Core/Instruments.h"
+#include "Widgets.h"
 
 namespace jgl
 {
 
 class GrooveLabProcessor;
 
-/** Small vector-icon button (lock / regenerate). */
-class IconButton : public juce::Button
+/**
+    One row of the ensemble list: illustration, name, role and a favourite heart.
+    Click the row to add/remove the instrument. When it is in the ensemble, a lock
+    (keep this pattern) and a regenerate button appear.
+*/
+class InstrumentRow : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    enum class Icon { Lock, Regenerate };
-    IconButton (Icon icon, const juce::String& tooltip);
-    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
-
-private:
-    Icon icon;
-};
-
-/** Selectable instrument tile: click to enable, lock to keep its pattern, regenerate just this part. */
-class InstrumentTile : public juce::Component, public juce::SettableTooltipClient
-{
-public:
-    InstrumentTile (GrooveLabProcessor& p, InstrumentId id);
+    InstrumentRow (GrooveLabProcessor& p, InstrumentId id);
 
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseUp (const juce::MouseEvent&) override;
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseEnter (const juce::MouseEvent&) override { updateButtons(); repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { updateButtons(); repaint(); }
 
-    /** Called by the editor timer: lock state & sample source may change. */
     void refresh();
+    InstrumentId getInstrument() const noexcept { return id; }
+    bool isFavourite() const noexcept { return favButton.getToggleState(); }
+    std::function<void()> onFavouriteChanged;
 
 private:
+    void updateButtons();
+
     GrooveLabProcessor& processor;
     InstrumentId id;
     bool enabled = false;
     bool usesSamples = false;
-    IconButton lockButton { IconButton::Icon::Lock, "Lock: keep this pattern when generating" };
-    IconButton regenButton { IconButton::Icon::Regenerate, "Regenerate only this part" };
+    IconButton favButton { decor::Icon::Heart, decor::Icon::HeartFilled, "Favourite" };
+    IconButton lockButton { decor::Icon::LockOpen, decor::Icon::LockClosed, "Lock: keep this part when generating" };
+    IconButton regenButton { decor::Icon::Regenerate, decor::Icon::Regenerate, "Regenerate only this part" };
     std::unique_ptr<juce::ParameterAttachment> attachment;
 };
 

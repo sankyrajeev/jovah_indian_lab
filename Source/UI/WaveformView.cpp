@@ -1,6 +1,7 @@
 #include "WaveformView.h"
 
 #include "../Plugin/PluginProcessor.h"
+#include "Decor.h"
 #include "Theme.h"
 
 namespace jgl
@@ -17,7 +18,7 @@ bool startLoopFileDrag (GrooveLabProcessor& processor, juce::Component* source,
         return false;
     }
 
-    if (status) status ("Dragging " + file.getFileName() + "  (also saved in " + file.getParentDirectory().getFullPathName() + ")");
+    if (status) status ("Dragging " + file.getFileName());
 
     const bool started = juce::DragAndDropContainer::performExternalDragDropOfFiles (
         juce::StringArray { file.getFullPathName() }, false, source,
@@ -32,7 +33,7 @@ bool startLoopFileDrag (GrooveLabProcessor& processor, juce::Component* source,
 //==============================================================================
 WaveformView::WaveformView (GrooveLabProcessor& p) : processor (p)
 {
-    setTooltip ("Drag the waveform into your DAW to drop the loop as a WAV file. Click to play / stop.");
+    setTooltip ("Drag the waveform into your DAW to drop the loop as a WAV file. Click to play or stop.");
     setMouseCursor (juce::MouseCursor::DraggingHandCursor);
 }
 
@@ -52,41 +53,44 @@ void WaveformView::setBusy (bool b)
     if (b != busy) { busy = b; repaint(); }
 }
 
+juce::Rectangle<float> WaveformView::gripArea() const
+{
+    auto r = getLocalBounds().toFloat();
+    return r.removeFromRight (56.0f);
+}
+
 void WaveformView::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour (Colours::panel);
-    g.fillRoundedRectangle (r, 8.0f);
-    g.setColour (Colours::outline);
-    g.drawRoundedRectangle (r.reduced (0.5f), 8.0f, 1.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.12f));
+    g.fillRoundedRectangle (r.translated (0.0f, 2.0f), 14.0f);
+    g.setGradientFill (juce::ColourGradient (Colours::darkRaised, r.getX(), r.getY(), Colours::dark, r.getX(), r.getBottom(), false));
+    g.fillRoundedRectangle (r, 14.0f);
 
-    auto area = r.reduced (10.0f, 8.0f);
-    area.removeFromTop (14.0f);
+    const auto grip = gripArea();
+    decor::drawIcon (g, decor::Icon::Grip, grip.withSizeKeepingCentre (18.0f, 22.0f), Colours::paper.withAlpha (isMouseOver() ? 0.9f : 0.55f));
+
+    auto area = r.withTrimmedLeft (34.0f).withTrimmedRight (grip.getWidth() + 6.0f).reduced (0.0f, 12.0f);
+    area.removeFromTop (12.0f);
 
     if (result == nullptr || result->peakMax.empty())
     {
-        g.setColour (Colours::textFaint);
-        g.setFont (uiFont (14.0f));
+        g.setColour (Colours::paper.withAlpha (0.6f));
+        g.setFont (Fonts::serif (17.0f));
         g.drawText ("Rendering...", area, juce::Justification::centred);
         return;
     }
 
-    // Bar / beat grid
+    // Bar grid
     const int bars = result->arrangement.bars;
-    const int beats = bars * 4;
-    for (int b = 0; b <= beats; ++b)
+    for (int b = 0; b < bars; ++b)
     {
-        const float x = area.getX() + area.getWidth() * (float) b / (float) beats;
-        const bool barLine = b % 4 == 0;
-        g.setColour (barLine ? Colours::outline.brighter (0.15f) : Colours::outline.withAlpha (0.5f));
+        const float x = area.getX() + area.getWidth() * (float) b / (float) bars;
+        g.setColour (Colours::paper.withAlpha (0.5f));
+        g.setFont (Fonts::serif (13.0f));
+        g.drawText (juce::String (b + 1), juce::Rectangle<float> (x - 10.0f, r.getY() + 4.0f, 20.0f, 14.0f), juce::Justification::centred);
+        g.setColour (Colours::paper.withAlpha (0.08f));
         g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
-        if (barLine && b < beats)
-        {
-            g.setColour (Colours::textFaint);
-            g.setFont (uiFont (10.0f, true));
-            g.drawText (juce::String (b / 4 + 1), juce::Rectangle<float> (x + 3.0f, r.getY() + 4.0f, 30.0f, 12.0f),
-                        juce::Justification::centredLeft);
-        }
     }
 
     // Peaks
@@ -105,34 +109,37 @@ void WaveformView::paint (juce::Graphics& g)
             lo = juce::jmin (lo, result->peakMin[(size_t) b]);
             hi = juce::jmax (hi, result->peakMax[(size_t) b]);
         }
-        const float x = area.getX() + (float) px;
-        wave.addRectangle (x, mid - hi * half, 1.0f, juce::jmax (1.0f, (hi - lo) * half));
+        wave.addRectangle (area.getX() + (float) px, mid - hi * half, 1.0f, juce::jmax (1.0f, (hi - lo) * half));
     }
-
-    const bool playing = playhead >= 0.0f;
-    g.setColour ((playing ? Colours::accent : Colours::accent.withAlpha (0.75f)).withMultipliedAlpha (busy ? 0.5f : 1.0f));
+    g.setGradientFill (juce::ColourGradient (Colours::copperLight, area.getX(), area.getY(), Colours::wave, area.getX(), mid, false));
+    if (busy) g.setOpacity (0.5f);
     g.fillPath (wave);
 
-    if (playing)
+    if (playhead >= 0.0f)
     {
         const float x = area.getX() + area.getWidth() * playhead;
-        g.setColour (Colours::text);
-        g.drawLine (x, area.getY() - 2.0f, x, area.getBottom() + 2.0f, 1.5f);
+        g.setColour (Colours::copperLight);
+        g.drawLine (x, area.getY() - 2.0f, x, area.getBottom() + 4.0f, 1.6f);
+        juce::Path tri;
+        tri.addTriangle (x - 5.0f, r.getY() + 5.0f, x + 5.0f, r.getY() + 5.0f, x, r.getY() + 12.0f);
+        g.fillPath (tri);
     }
 
     if (busy)
     {
-        g.setColour (Colours::textDim);
-        g.setFont (uiFont (11.0f, true));
-        g.drawText ("RENDERING", r.reduced (10.0f, 4.0f).removeFromTop (12.0f), juce::Justification::centredRight);
+        g.setColour (Colours::paper.withAlpha (0.7f));
+        g.setFont (Fonts::caps (10.0f));
+        g.drawText ("RENDERING", r.reduced (16.0f, 6.0f).withTrimmedRight (grip.getWidth()).removeFromTop (14.0f), juce::Justification::centredRight);
     }
 }
+
+void WaveformView::mouseMove (const juce::MouseEvent&) { repaint (gripArea().toNearestInt()); }
 
 void WaveformView::mouseDown (const juce::MouseEvent&) { dragStarted = false; }
 
 void WaveformView::mouseDrag (const juce::MouseEvent& e)
 {
-    if (! dragStarted && e.getDistanceFromDragStart() > 6)
+    if (! dragStarted && e.getDistanceFromDragStart() > 5)
     {
         dragStarted = true;
         startLoopFileDrag (processor, this, onStatus);
@@ -144,42 +151,6 @@ void WaveformView::mouseUp (const juce::MouseEvent& e)
     if (! dragStarted && e.mouseWasClicked() && onClick)
         onClick();
     dragStarted = false;
-}
-
-//==============================================================================
-DragHandle::DragHandle (GrooveLabProcessor& p) : processor (p)
-{
-    setTooltip ("Drag into Ableton Live (or any DAW / Finder) to drop the loop as a WAV file.");
-    setMouseCursor (juce::MouseCursor::DraggingHandCursor);
-}
-
-void DragHandle::paint (juce::Graphics& g)
-{
-    auto r = getLocalBounds().toFloat().reduced (0.5f);
-    const bool over = isMouseOver();
-    g.setColour (over ? Colours::accent.withAlpha (0.18f) : Colours::panelRaised);
-    g.fillRoundedRectangle (r, 8.0f);
-    g.setColour (over ? Colours::accent : Colours::outline);
-    g.drawRoundedRectangle (r, 8.0f, 1.2f);
-
-    // Grip dots
-    auto icon = r.removeFromTop (r.getHeight() * 0.55f);
-    g.setColour (over ? Colours::accent : Colours::textDim);
-    for (int row = 0; row < 3; ++row)
-        for (int col = 0; col < 2; ++col)
-            g.fillEllipse (icon.getCentreX() - 6.0f + col * 9.0f, icon.getCentreY() - 8.0f + row * 7.0f, 3.5f, 3.5f);
-
-    g.setFont (uiFont (11.0f, true));
-    g.drawFittedText ("DRAG\nTO DAW", r.toNearestInt(), juce::Justification::centredTop, 2);
-}
-
-void DragHandle::mouseDrag (const juce::MouseEvent& e)
-{
-    if (! dragStarted && e.getDistanceFromDragStart() > 4)
-    {
-        dragStarted = true;
-        startLoopFileDrag (processor, this, onStatus);
-    }
 }
 
 } // namespace jgl
