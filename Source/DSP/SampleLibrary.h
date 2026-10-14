@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <map>
 #include <memory>
@@ -10,6 +11,20 @@
 
 namespace jgl
 {
+
+/** Amplitude envelope for recorded melodic notes (Attack / Decay / Sustain / Release). */
+struct NoteEnvelope
+{
+    double attackSec = 0.03;    // fade-in, softens the recording's own (tongued, plucked) attack
+    double decaySec = 0.8;      // time to settle from full level to the sustain level
+    double sustain = 0.9;       // held level, 0..1
+    double releaseSec = 0.15;   // fade-out after the note ends
+
+    /** Gain at time t of a note held for durationSec (attack and release are raised-cosine). */
+    double gainAt (double t, double durationSec) const;
+    double attack() const noexcept  { return std::max (0.002, attackSec); }    // never a hard edge
+    double release() const noexcept { return std::max (0.005, releaseSec); }
+};
 
 /**
     Optional recorded multi-samples that replace the synthesized voices.
@@ -60,9 +75,11 @@ public:
     /** Renders a sample-based hit / note into `out` (mono), resampled to `sampleRate`. */
     static void renderHit (const Sample& s, float velocity, int numLayers, double sampleRate, std::vector<float>& out);
     /** Pitch-shifted playback following a pitch curve (glides, gamaka, falls, vibrato), looping
-        the sustain region for notes longer than the recording. */
+        the sustain region for notes longer than the recording, shaped by `envelope`. The output
+        is durationSec + envelope release long and always starts and ends at silence. */
     static void renderNote (const Sample& s, double targetMidi, float velocity, double durationSec,
-                            const PitchCurve& curve, double sampleRate, std::vector<float>& out);
+                            const PitchCurve& curve, const NoteEnvelope& envelope, double sampleRate,
+                            std::vector<float>& out);
 
     /** Detects pitch and a sustain loop for a one-note recording (fills rootMidi if < 0). */
     static void analyseNote (Sample& s);

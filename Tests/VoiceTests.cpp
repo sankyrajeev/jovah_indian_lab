@@ -62,7 +62,7 @@ public:
 
             std::vector<float> out;
             PitchCurve flat;
-            SampleLibrary::renderNote (s, 62.0, 0.9f, 5.0, flat, 48000.0, out);   // D4, much longer than the recording
+            SampleLibrary::renderNote (s, 62.0, 0.9f, 5.0, flat, NoteEnvelope {}, 48000.0, out);   // D4, much longer than the recording
             expectGreaterThan ((int) out.size(), (int) (5.0 * 48000.0));
 
             juce::AudioBuffer<float> b (1, (int) out.size());
@@ -89,13 +89,53 @@ public:
             fall.fallStart = 0.6;
             fall.fallEnd = 1.0;
             std::vector<float> out;
-            SampleLibrary::renderNote (s, 70.0, 0.9f, 1.0, fall, 48000.0, out);
+            SampleLibrary::renderNote (s, 70.0, 0.9f, 1.0, fall, NoteEnvelope {}, 48000.0, out);
             juce::AudioBuffer<float> b (1, (int) out.size());
             for (size_t i = 0; i < out.size(); ++i) b.setSample (0, (int) i, out[i]);
             const double start = SampleAnalysis::hzToMidi (SampleAnalysis::estimatePitchHz (b, 48000.0, 4800, 24000));
             const double end = SampleAnalysis::hzToMidi (SampleAnalysis::estimatePitchHz (b, 48000.0, 44000, 48500));
             expectWithinAbsoluteError (start, 70.0, 0.1);
             expectLessThan (end, 67.0);
+        }
+
+        beginTest ("Envelope: soft attack, decay to sustain, release to silence, no hard edges");
+        {
+            SampleLibrary::Sample s;
+            s.data = note;
+            s.sampleRate = sr;
+            SampleLibrary::analyseNote (s);
+
+            auto rmsAt = [] (const std::vector<float>& v, double t0, double t1)
+            {
+                double sum = 0.0; int n = 0;
+                for (int i = (int) (t0 * 48000.0); i < std::min ((int) v.size(), (int) (t1 * 48000.0)); ++i, ++n)
+                    sum += (double) v[(size_t) i] * v[(size_t) i];
+                return n > 0 ? std::sqrt (sum / n) : 0.0;
+            };
+
+            NoteEnvelope env;
+            env.attackSec = 0.1; env.decaySec = 0.4; env.sustain = 0.5; env.releaseSec = 0.3;
+            std::vector<float> out;
+            SampleLibrary::renderNote (s, 70.0, 0.9f, 1.5, PitchCurve {}, env, 48000.0, out);
+            expectEquals ((int) out.size(), (int) (1.8 * 48000.0));
+            expectLessThan (rmsAt (out, 0.0, 0.01), rmsAt (out, 0.09, 0.11) * 0.1, "attack starts from silence");
+            expectWithinAbsoluteError (rmsAt (out, 1.3, 1.45) / rmsAt (out, 0.09, 0.11), 0.5, 0.12);   // settled at sustain
+            expectLessThan (std::abs (out.back()), 1.0e-4f);
+            expectLessThan (rmsAt (out, 1.75, 1.8), rmsAt (out, 1.3, 1.45) * 0.05, "released to silence");
+
+            expectWithinAbsoluteError (env.gainAt (0.1, 1.5), 1.0, 1.0e-6);
+            expectWithinAbsoluteError (env.gainAt (1.5 + 0.3, 1.5), 0.0, 1.0e-6);
+
+            // A zero attack is still never a hard edge, and an unlooped sample fades before it runs out.
+            NoteEnvelope hard;
+            hard.attackSec = 0.0;
+            SampleLibrary::Sample raw = s;
+            raw.loopStart = raw.loopEnd = -1;
+            SampleLibrary::renderNote (raw, 70.0, 1.0f, 10.0, PitchCurve {}, hard, 48000.0, out);
+            expectLessThan (std::abs (out[1]), 0.02f);
+            int last = (int) out.size() - 1;
+            while (last > 0 && out[(size_t) last] == 0.0f) --last;
+            expectLessThan (rmsAt (out, (last - 48) / 48000.0, last / 48000.0), 0.01, "no cut when the recording ends");
         }
 
         beginTest ("Expression knobs shape the melody, notes stay in the scale");

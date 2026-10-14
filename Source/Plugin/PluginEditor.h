@@ -54,7 +54,7 @@ private:
     void showStyleMenu();
     void addUtilityItems (juce::PopupMenu& m);
     void chooseVoiceSample();
-    void showVoicePanel();
+    void showVoicePanel (InstrumentId id = InstrumentId::CustomVoice);
     void loadVoice (const juce::File& f);
     void handleUtilityResult (int r);
     Knob& addKnob (juce::OwnedArray<Knob>& into, const char* paramId, const juce::String& caption, const juce::String& tooltip);

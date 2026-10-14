@@ -20,7 +20,8 @@ namespace
                                         ParamIDs::style, ParamIDs::framework, complexity, swing, groove, humanize,
                                         density, energy, variation, ghost, accent, saturation, reverb, delay,
                                         delayTime, filter, voiceBend, voiceShake, voiceFalls, voiceStutter,
-                                        voiceOctave, voiceVibrato };
+                                        voiceOctave, voiceVibrato, sampleAttack, sampleDecay, sampleSustain,
+                                        sampleRelease };
         for (auto id : allInstruments())
             ids.push_back (ParamIDs::instrument (id));
         return ids;
@@ -186,6 +187,10 @@ RenderSettings GrooveLabProcessor::renderSettingsFromParams() const
     rs.filter = param (filter);
     rs.levelDb = param (ParamIDs::level);
     rs.voiceVibrato = param (voiceVibrato);
+    rs.sampleAttackMs = param (sampleAttack);
+    rs.sampleDecayMs = param (sampleDecay);
+    rs.sampleSustain = param (sampleSustain);
+    rs.sampleReleaseMs = param (sampleRelease);
     rs.sampleRate = preparedSampleRate.load();
     return rs;
 }

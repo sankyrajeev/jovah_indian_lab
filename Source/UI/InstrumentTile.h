@@ -29,10 +29,12 @@ public:
     InstrumentId getInstrument() const noexcept { return id; }
     bool isFavourite() const noexcept { return favButton.getToggleState(); }
     std::function<void()> onFavouriteChanged;
-    std::function<void()> onLoadSample, onVoiceSettings;   // "Your Sample" row only
+    std::function<void()> onLoadSample;      // "Your Sample" row only
+    std::function<void()> onVoiceSettings;   // Your Sample, and melodic rows playing recorded notes
 
 private:
     void updateButtons();
+    bool hasSettings() const noexcept { return id == InstrumentId::CustomVoice || (usesSamples && isMelodic (id)); }
 
     GrooveLabProcessor& processor;
     InstrumentId id;
@@ -42,7 +44,7 @@ private:
     IconButton lockButton { decor::Icon::LockOpen, decor::Icon::LockClosed, "Lock: keep this part when generating" };
     IconButton regenButton { decor::Icon::Regenerate, decor::Icon::Regenerate, "Regenerate only this part" };
     IconButton loadButton { decor::Icon::Upload, decor::Icon::Upload, "Load a single-note sample (or drag a WAV onto the plugin)" };
-    IconButton settingsButton { decor::Icon::Sliders, decor::Icon::Sliders, "Expression: bend, shake, falls, stutter, octave, vibrato" };
+    IconButton settingsButton { decor::Icon::Sliders, decor::Icon::Sliders, "Expression and envelope: bend, shake, falls, vibrato, attack, decay, sustain, release" };
     std::unique_ptr<juce::ParameterAttachment> attachment;
 };
 

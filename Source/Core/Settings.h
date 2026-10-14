@@ -57,6 +57,11 @@ struct RenderSettings
     float filter = 0.0f;      // -1 = low-pass .. 0 = off .. +1 = high-pass
     float levelDb = 0.0f;     // master output level applied after normalisation
     float voiceVibrato = 0.0f; // vibrato depth of the sample-driven voice
+    // Envelope of recorded melodic notes (Your Sample and melodic multi-samples)
+    float sampleAttackMs = 30.0f;
+    float sampleDecayMs = 800.0f;
+    float sampleSustain = 0.9f;
+    float sampleReleaseMs = 150.0f;
     double sampleRate = 48000.0;
 
     bool operator== (const RenderSettings& o) const noexcept
@@ -65,6 +70,8 @@ struct RenderSettings
             && humanize == o.humanize && ghost == o.ghost && accent == o.accent
             && saturation == o.saturation && reverb == o.reverb && delay == o.delay
             && delayTime == o.delayTime && filter == o.filter && levelDb == o.levelDb && voiceVibrato == o.voiceVibrato
+            && sampleAttackMs == o.sampleAttackMs && sampleDecayMs == o.sampleDecayMs
+            && sampleSustain == o.sampleSustain && sampleReleaseMs == o.sampleReleaseMs
             && sampleRate == o.sampleRate;
     }
     bool operator!= (const RenderSettings& o) const noexcept { return ! (*this == o); }

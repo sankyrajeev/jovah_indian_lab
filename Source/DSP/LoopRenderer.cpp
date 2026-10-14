@@ -138,7 +138,18 @@ namespace
         });
     }
 
-    bool renderWithSamples (const SampleLibrary* lib, const VoiceRequest& req, double midi, std::vector<float>& out)
+    NoteEnvelope noteEnvelope (const RenderSettings& rs)
+    {
+        NoteEnvelope e;
+        e.attackSec = rs.sampleAttackMs / 1000.0;
+        e.decaySec = rs.sampleDecayMs / 1000.0;
+        e.sustain = rs.sampleSustain;
+        e.releaseSec = rs.sampleReleaseMs / 1000.0;
+        return e;
+    }
+
+    bool renderWithSamples (const SampleLibrary* lib, const VoiceRequest& req, double midi, const NoteEnvelope& env,
+                            std::vector<float>& out)
     {
         if (lib == nullptr)
             return false;
@@ -148,7 +159,7 @@ namespace
         {
             if (const auto* s = lib->pickNote (id, midi, req.seed))
             {
-                SampleLibrary::renderNote (*s, midi, req.velocity, req.durationSec, Voices::makePitchCurve (req), req.sampleRate, out);
+                SampleLibrary::renderNote (*s, midi, req.velocity, req.durationSec, Voices::makePitchCurve (req), env, req.sampleRate, out);
                 return true;
             }
             return false;
@@ -261,6 +272,7 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
 
     // Drone plucks repeat every bar: render each string twice (two takes) and re-use them.
     std::map<std::pair<int, int>, std::pair<float, std::vector<float>>> droneCache;
+    const auto envelope = noteEnvelope (rs);
 
     for (const auto& part : a.parts)
     {
@@ -308,11 +320,11 @@ bool LoopRenderer::render (const Arrangement& a, const RenderSettings& rs, juce:
             {
                 if (opt.userVoice != nullptr)
                     SampleLibrary::renderNote (*opt.userVoice, midi, req.velocity, req.durationSec,
-                                               Voices::makePitchCurve (req), sr, mono);
+                                               Voices::makePitchCurve (req), envelope, sr, mono);
                 else
                     mono.clear();   // nothing loaded yet
             }
-            else if (! renderWithSamples (opt.samples, req, midi, mono))
+            else if (! renderWithSamples (opt.samples, req, midi, envelope, mono))
             {
                 if (id == InstrumentId::Tanpura)
                 {

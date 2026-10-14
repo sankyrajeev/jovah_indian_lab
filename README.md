@@ -173,6 +173,16 @@ jgl_import --instrument nadaswaram ~/Packs/Nadaswaram/Sustains/
 - **Distributing the plugin with sounds:** use CC0 recordings, your own recordings, or a publisher's explicit OEM/redistribution licence.
 - **Sounds pulled out of another commercial plugin:** do not extract them. Swar Plug is one example.
 
+**Envelope of recorded notes.** The sliders button on **Your Sample**, or on any melodic row that
+plays recorded notes, opens **Attack / Decay / Sustain / Release**. These shape every recorded melodic
+note and are shared by all of them:
+- **Attack:** default 30 ms. It softens tongued or plucked starts, so legato lines don't click.
+- **Decay / Sustain:** default 800 ms to 90 %. A held note settles from full level down to the sustain level.
+- **Release:** default 150 ms. It is the fade after each note.
+
+Even at the shortest settings, a note is never cut hard. A recording without a sustain loop fades out before it runs out.
+`jgl_render` takes the same settings: `--attack`, `--decay`, `--sustain`, `--release`.
+
 WAV, AIFF and FLAC are supported. Files are downmixed to mono and trimmed to 12 s. Use **… → Rescan
 samples** after adding files. Tiles show **SAMPLES** or **MODELLED** so you always know which you hear.
 **Never use material cut from commercial songs.** Use recordings you made or properly licensed,

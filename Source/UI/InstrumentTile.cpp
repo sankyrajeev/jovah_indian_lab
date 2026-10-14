@@ -43,10 +43,14 @@ InstrumentRow::InstrumentRow (GrooveLabProcessor& p, InstrumentId i) : processor
     if (id == InstrumentId::CustomVoice)
     {
         loadButton.onClick = [this] { if (onLoadSample) onLoadSample(); };
-        settingsButton.onClick = [this] { if (onVoiceSettings) onVoiceSettings(); };
         addAndMakeVisible (loadButton);
-        addAndMakeVisible (settingsButton);
     }
+    else
+    {
+        settingsButton.setTooltip ("Envelope of the recorded notes: attack, decay, sustain, release");
+    }
+    settingsButton.onClick = [this] { if (onVoiceSettings) onVoiceSettings(); };
+    addChildComponent (settingsButton);
     refresh();
 }
 
@@ -74,8 +78,10 @@ void InstrumentRow::refresh()
     if (samples != usesSamples)
     {
         usesSamples = samples;
+        resized();
         repaint();
     }
+    settingsButton.setVisible (hasSettings());
 }
 
 void InstrumentRow::paint (juce::Graphics& g)
@@ -109,7 +115,7 @@ void InstrumentRow::paint (juce::Graphics& g)
         decor::drawInstrument (g, id, iconArea);
     }
 
-    auto text = r.withLeft (iconArea.getRight() + 16.0f).withTrimmedRight (id == InstrumentId::CustomVoice ? 140.0f : 90.0f);
+    auto text = r.withLeft (iconArea.getRight() + 16.0f).withTrimmedRight (id == InstrumentId::CustomVoice ? 140.0f : (hasSettings() ? 115.0f : 90.0f));
     g.setColour (Colours::ink);
     g.setFont (Fonts::serif (20.0f, enabled));
     g.drawText (info.name, text.removeFromTop (r.getHeight() * 0.56f).withTrimmedTop (4.0f), juce::Justification::bottomLeft);
@@ -127,11 +133,10 @@ void InstrumentRow::resized()
     auto r = getLocalBounds().reduced (6, 0);
     const int s = 26;
     favButton.setBounds (r.removeFromRight (s + 4).withSizeKeepingCentre (s, s));
-    if (id == InstrumentId::CustomVoice)
-    {
+    if (hasSettings())
         settingsButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 4, s - 4));
+    if (id == InstrumentId::CustomVoice)
         loadButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 4, s - 4));
-    }
     regenButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 2, s - 2));
     lockButton.setBounds (r.removeFromRight (s).withSizeKeepingCentre (s - 2, s - 2));
 }

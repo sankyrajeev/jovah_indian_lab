@@ -11,6 +11,21 @@ namespace
 {
     juce::String percentText (float v, int) { return juce::String (juce::roundToInt (v * 100.0f)) + "%"; }
 
+    juce::String timeText (float ms, int)
+    {
+        return ms < 1000.0f ? juce::String (juce::roundToInt (ms)) + " ms" : juce::String (ms / 1000.0f, 2) + " s";
+    }
+
+    std::unique_ptr<juce::AudioParameterFloat> timeParam (const char* id, const char* name, float minMs, float maxMs,
+                                                          float centreMs, float def)
+    {
+        juce::NormalisableRange<float> range (minMs, maxMs);
+        range.setSkewForCentre (centreMs);
+        return std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID { id, 1 }, name, range, def,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction (timeText).withLabel ("ms"));
+    }
+
     std::unique_ptr<juce::AudioParameterFloat> unitParam (const char* id, const char* name, float def)
     {
         return std::make_unique<juce::AudioParameterFloat> (
@@ -78,6 +93,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add (unitParam (voiceStutter, "Voice Stutter", 0.1f));
     layout.add (unitParam (voiceOctave, "Voice Octave", 0.15f));
     layout.add (unitParam (voiceVibrato, "Voice Vibrato", 0.0f));
+
+    const RenderSettings defaults;
+    layout.add (timeParam (sampleAttack, "Sample Attack", 1.0f, 1000.0f, 60.0f, defaults.sampleAttackMs));
+    layout.add (timeParam (sampleDecay, "Sample Decay", 10.0f, 4000.0f, 600.0f, defaults.sampleDecayMs));
+    layout.add (unitParam (sampleSustain, "Sample Sustain", defaults.sampleSustain));
+    layout.add (timeParam (sampleRelease, "Sample Release", 5.0f, 3000.0f, 250.0f, defaults.sampleReleaseMs));
 
     for (auto id : allInstruments())
     {

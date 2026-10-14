@@ -39,6 +39,12 @@ namespace jgl::ParamIDs
     inline constexpr const char* voiceOctave  = "voiceOctave";
     inline constexpr const char* voiceVibrato = "voiceVibrato";
 
+    // Envelope of recorded melodic notes
+    inline constexpr const char* sampleAttack  = "sampleAttack";
+    inline constexpr const char* sampleDecay   = "sampleDecay";
+    inline constexpr const char* sampleSustain = "sampleSustain";
+    inline constexpr const char* sampleRelease = "sampleRelease";
+
     /** "inst_tabla", "inst_sitar" ... */
     inline juce::String instrument (InstrumentId id) { return juce::String ("inst_") + instrumentInfo (id).key; }
 

@@ -209,7 +209,7 @@ void GrooveLabEditor::setupEnsemble()
         auto* row = rows.add (new InstrumentRow (processor, id));
         row->onFavouriteChanged = [this] { if (favouritesOnly) layoutRows(); };
         row->onLoadSample = [this] { chooseVoiceSample(); };
-        row->onVoiceSettings = [this] { showVoicePanel(); };
+        row->onVoiceSettings = [this, id] { showVoicePanel (id); };
         rowHolder.addAndMakeVisible (row);
     }
 }
@@ -748,13 +748,13 @@ void GrooveLabEditor::chooseVoiceSample()
     });
 }
 
-void GrooveLabEditor::showVoicePanel()
+void GrooveLabEditor::showVoicePanel (InstrumentId id)
 {
-    auto panel = std::make_unique<VoicePanel> (processor, [this] { chooseVoiceSample(); });
+    auto panel = std::make_unique<VoicePanel> (processor, id, [this] { chooseVoiceSample(); });
     panel->setLookAndFeel (&lnf);
     juce::Rectangle<int> anchor;
     for (auto* r : rows)
-        if (r->getInstrument() == InstrumentId::CustomVoice)
+        if (r->getInstrument() == id)
             anchor = getLocalArea (r, r->getLocalBounds());
     juce::CallOutBox::launchAsynchronously (std::move (panel), anchor, this);
 }

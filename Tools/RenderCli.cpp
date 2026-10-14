@@ -4,6 +4,8 @@
 //   jgl_render --list                       (styles, scales, instruments, frameworks)
 //   jgl_render ... --describe               (print the composed parts)
 //   jgl_render ... --stems out_dir          (also write one WAV per part)
+//   jgl_render ... --attack 30 --decay 800 --sustain 0.9 --release 150
+//                                           (envelope of recorded melodic notes, ms / 0..1)
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -113,6 +115,10 @@ int main (int argc, char* argv[])
     cs.voiceStutter = arg (a, "--stutter", "0.1").getFloatValue();
     cs.voiceOctave = arg (a, "--octave", "0.15").getFloatValue();
     rs.voiceVibrato = arg (a, "--vibrato", "0.0").getFloatValue();
+    rs.sampleAttackMs = arg (a, "--attack", juce::String (rs.sampleAttackMs)).getFloatValue();
+    rs.sampleDecayMs = arg (a, "--decay", juce::String (rs.sampleDecayMs)).getFloatValue();
+    rs.sampleSustain = arg (a, "--sustain", juce::String (rs.sampleSustain)).getFloatValue();
+    rs.sampleReleaseMs = arg (a, "--release", juce::String (rs.sampleReleaseMs)).getFloatValue();
 
     const auto voicePath = arg (a, "--voice");
     if (voicePath.isNotEmpty())

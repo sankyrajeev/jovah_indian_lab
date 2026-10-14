@@ -243,17 +243,41 @@ void SampleLibrary::renderHit (const Sample& s, float velocity, int numLayers, d
         out[(size_t) i] = readInterpolated (s.data, i * ratio) * gain;
 }
 
-void SampleLibrary::renderNote (const Sample& s, double targetMidi, float velocity, double durationSec,
-                                const PitchCurve& curve, double sampleRate, std::vector<float>& out)
+double NoteEnvelope::gainAt (double t, double durationSec) const
 {
-    const double release = 0.06;
-    const int len = (int) ((durationSec + release) * sampleRate);
+    const double a = attack(), r = release();
+    const double s = juce::jlimit (0.0, 1.0, sustain);
+    const double tau = std::max (0.002, decaySec) / 4.0;   // ~98% of the way to sustain after decaySec
+
+    auto held = [&] (double x)
+    {
+        const double rise = x < a ? 0.5 - 0.5 * std::cos (juce::MathConstants<double>::pi * x / a) : 1.0;
+        const double fall = x > a ? s + (1.0 - s) * std::exp (-(x - a) / tau) : 1.0;
+        return rise * fall;
+    };
+
+    if (t < 0.0)
+        return 0.0;
+    if (t <= durationSec)
+        return held (t);
+    if (t >= durationSec + r)
+        return 0.0;
+    const double k = (t - durationSec) / r;
+    return held (durationSec) * (0.5 + 0.5 * std::cos (juce::MathConstants<double>::pi * k));
+}
+
+void SampleLibrary::renderNote (const Sample& s, double targetMidi, float velocity, double durationSec,
+                                const PitchCurve& curve, const NoteEnvelope& envelope, double sampleRate,
+                                std::vector<float>& out)
+{
+    const int len = (int) ((durationSec + envelope.release()) * sampleRate);
     out.assign ((size_t) std::max (0, len), 0.0f);
 
     const int n = s.data.getNumSamples();
     const bool canLoop = s.loopStart >= 0 && s.loopEnd > s.loopStart && s.loopEnd < n;
     const double loopLen = canLoop ? (double) (s.loopEnd - s.loopStart) : 0.0;
     const double xf = canLoop ? std::min (0.03 * s.sampleRate, loopLen / 3.0) : 0.0;
+    const double endFade = 0.01 * s.sampleRate;   // without a loop, fade out before the recording runs out
 
     const double baseRatio = s.sampleRate / sampleRate;
     const float gain = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 1.2f);
@@ -265,9 +289,9 @@ void SampleLibrary::renderNote (const Sample& s, double targetMidi, float veloci
         const double t = i / sampleRate;
         const double semis = targetMidi - root + curve.semis (t);
 
-        float env = 1.0f;
-        if (t > durationSec)
-            env = (float) std::max (0.0, 1.0 - (t - durationSec) / release);
+        double env = envelope.gainAt (t, durationSec);
+        if (! canLoop)
+            env *= juce::jlimit (0.0, 1.0, (n - 1 - pos) / endFade);
 
         float v;
         if (canLoop && pos >= s.loopEnd - xf)
@@ -281,7 +305,7 @@ void SampleLibrary::renderNote (const Sample& s, double targetMidi, float veloci
             v = readInterpolated (s.data, pos);
         }
 
-        out[(size_t) i] = v * gain * env;
+        out[(size_t) i] = v * gain * (float) env;
         pos += baseRatio * std::pow (2.0, semis / 12.0);
 
         if (canLoop && pos >= s.loopEnd)
